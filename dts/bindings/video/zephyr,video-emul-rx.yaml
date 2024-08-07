@@ -14,3 +14,7 @@ include: base.yaml
 child-binding:
   child-binding:
     include: video-interfaces.yaml
+
+    properties:
+      reg:
+        type: int
