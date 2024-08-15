@@ -33,3 +33,28 @@ Setup
    Registered GTBS bearer
    Registered bearer[1]
    uart:~$ bt connect xx:xx:xx:xx:xx:xx public
+
+Call Control Client
+*******************
+The Call Control Client is a role that typically resides on resource contrained devices such as
+earbuds or headsets.
+
+Using the Call Control Client
+=============================
+The Client can control a remote CCP server device.
+For example a remote device may have an incoming call that can be accepted by the Client.
+
+.. code-block:: console
+
+   uart:~$ ccp_client --help
+   ccp_client - Bluetooth CCP client shell commands
+   Subcommands:
+     discover  : Discover GTBS and TBS on remote device
+
+Example Usage when connected
+============================
+
+.. code-block:: console
+
+   uart:~$ ccp_client discover
+   Discovery completed with GTBS and 1 TBS bearers

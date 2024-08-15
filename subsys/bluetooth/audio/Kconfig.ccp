@@ -7,6 +7,31 @@
 
 if BT_AUDIO
 
+config BT_CCP_CLIENT
+	bool "Call Control Profile Client Support"
+	depends on BT_EXT_ADV
+	depends on BT_TBS_CLIENT
+	depends on BT_BONDABLE
+	help
+	  This option enables support for the Call Control Profile Client which uses the Telephone
+	  Bearer Service (TBS) client to control calls on a remote device.
+
+if BT_CCP_CLIENT
+
+config BT_CCP_CLIENT_BEARER_COUNT
+	int "Telephone bearer count"
+	default 1
+	range 1 $(UINT8_MAX) if BT_TBS_CLIENT_TBS
+	range 1 1
+	help
+	  The number of supported telephone bearers on the CCP Client
+
+module = BT_CCP_CLIENT
+module-str = "Call Control Profile Client"
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # BT_CCP_CLIENT
+
 config BT_CCP_SERVER
 	bool "Call Control Profile Server Support"
 	depends on BT_EXT_ADV
