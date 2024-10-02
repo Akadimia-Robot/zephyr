@@ -50,6 +50,13 @@ config BT_CCP_SERVER_BEARER_COUNT
 	help
 	  The number of supported telephone bearers on the CCP Server
 
+config BT_CCP_SERVER_PROVIDER_NAME_MAX_LENGTH
+	int "The maximum length of the bearer provider name excluding null terminator"
+	default BT_TBS_MAX_PROVIDER_NAME_LENGTH
+	range 1 BT_TBS_MAX_PROVIDER_NAME_LENGTH
+	help
+	  Sets the maximum length of the bearer provider name.
+
 module = BT_CCP_SERVER
 module-str = "Call Control Profile Server"
 source "subsys/logging/Kconfig.template.log_config"
