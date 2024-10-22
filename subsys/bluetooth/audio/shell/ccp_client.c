@@ -62,11 +62,26 @@ static void ccp_client_bearer_provider_name_cb(struct bt_ccp_client_bearer *bear
 }
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_PROVIDER_NAME */
 
+#if defined(CONFIG_BT_TBS_CLIENT_BEARER_UCI)
+static void ccp_client_bearer_uci_cb(struct bt_ccp_client_bearer *bearer, int err, const char *name)
+{
+	if (err != 0) {
+		shell_error(ctx_shell, "Failed to read bearer %p UCI: %d", (void *)bearer, err);
+		return;
+	}
+
+	shell_info(ctx_shell, "Bearer %p UCI: %s", (void *)bearer, name);
+}
+#endif /* CONFIG_BT_TBS_CLIENT_BEARER_UCI */
+
 static struct bt_ccp_client_cb ccp_client_cbs = {
 	.discover = ccp_client_discover_cb,
 #if defined(CONFIG_BT_TBS_CLIENT_BEARER_PROVIDER_NAME)
 	.bearer_provider_name = ccp_client_bearer_provider_name_cb,
 #endif /* CONFIG_BT_TBS_CLIENT_BEARER_PROVIDER_NAME */
+#if defined(CONFIG_BT_TBS_CLIENT_BEARER_UCI)
+	.bearer_uci = ccp_client_bearer_uci_cb,
+#endif /* CONFIG_BT_TBS_CLIENT_BEARER_UCI */
 };
 
 static int cmd_ccp_client_discover(const struct shell *sh, size_t argc, char *argv[])
@@ -185,6 +200,36 @@ static int cmd_ccp_client_read_bearer_name(const struct shell *sh, size_t argc, 
 	return 0;
 }
 
+static int cmd_ccp_client_read_bearer_uci(const struct shell *sh, size_t argc, char *argv[])
+{
+	struct bt_ccp_client_bearer *bearer;
+	unsigned long index = 0;
+	int err;
+
+	if (argc > 1) {
+		index = validate_and_get_index(sh, argv[1]);
+		if (index < 0) {
+			return index;
+		}
+	}
+
+	bearer = get_bearer_by_index(index);
+	if (bearer == NULL) {
+		shell_error(sh, "Failed to get bearer for index %lu", index);
+
+		return -ENOEXEC;
+	}
+
+	err = bt_ccp_client_read_bearer_uci(bearer);
+	if (err != 0) {
+		shell_error(sh, "Failed to read bearer[%lu] UCI: %d", index, err);
+
+		return -ENOEXEC;
+	}
+
+	return 0;
+}
+
 static int cmd_ccp_client(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
@@ -202,6 +247,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(ccp_client_cmds,
 					     cmd_ccp_client_discover, 1, 0),
 			       SHELL_CMD_ARG(read_bearer_name, NULL, "Get bearer name [index]",
 					     cmd_ccp_client_read_bearer_name, 1, 1),
+			       SHELL_CMD_ARG(read_bearer_name, NULL, "Get bearer UCI [index]",
+					     cmd_ccp_client_read_bearer_uci, 1, 1),
 			       SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_ARG_REGISTER(ccp_client, &ccp_client_cmds, "Bluetooth CCP client shell commands",
