@@ -203,6 +203,33 @@ struct video_frmival_enum {
 };
 
 /**
+ * @brief Port / Endpoint DT Helpers
+ *
+ */
+
+/* Drivers should not use this except they know exactly that port has a pid */
+#define _DT_INST_PORT_BY_ID(n, pid)                                                                \
+	COND_CODE_1(DT_NODE_EXISTS(DT_INST_CHILD(n, ports)), (DT_CHILD(DT_INST_CHILD(n, ports), port_##pid)), (DT_INST_CHILD(n, port_##pid)))
+
+/* Drivers rarely use this as they usually deals with only endpoint */
+#define DT_INST_PORT_BY_ID(n, pid)                                                                 \
+	COND_CODE_1(DT_NODE_EXISTS(_DT_INST_PORT_BY_ID(n, pid)), (_DT_INST_PORT_BY_ID(n, pid)), (DT_INST_CHILD(n, port)))
+
+/* Drivers should not use this except they know exactly that the endpoint has a pid */
+#define _DT_INST_ENDPOINT_BY_ID(n, pid, id) DT_CHILD(DT_INST_PORT_BY_ID(n, pid), endpoint_##id)
+
+#define DT_INST_ENDPOINT_BY_ID(n, pid, id)                                                         \
+	COND_CODE_1(DT_NODE_EXISTS(_DT_INST_ENDPOINT_BY_ID(n, pid, id)), (_DT_INST_ENDPOINT_BY_ID(n, pid, id)), (DT_CHILD(DT_INST_PORT_BY_ID(n, pid), endpoint)))
+
+/* Drivers should not use this except they know exactly that the remote device has no ports node */
+#define DT_REMOTE_DEVICE_NO_PORTS(ep)                                                              \
+	DT_GPARENT(DT_NODELABEL(DT_STRING_TOKEN(ep, remote_endpoint_label)))
+
+#define DEVICE_DT_GET_REMOTE_DEVICE(ep)                                                            \
+	COND_CODE_1(DT_NODE_EXISTS(DT_CHILD(DT_PARENT(DT_REMOTE_DEVICE_NO_PORTS(ep)), ports)), \
+(DEVICE_DT_GET(DT_PARENT(DT_REMOTE_DEVICE_NO_PORTS(ep)))), (DEVICE_DT_GET(DT_REMOTE_DEVICE_NO_PORTS(ep))))
+
+/**
  * @brief video_endpoint_id enum
  *
  * Identify the video device endpoint.
