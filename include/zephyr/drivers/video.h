@@ -203,6 +203,38 @@ struct video_frmival_enum {
 };
 
 /**
+ * @brief Port / Endpoint DT Helpers
+ *
+ */
+
+#define _DT_INST_PORT_BY_ID(n, pid)                                                                \
+	COND_CODE_1(DT_NODE_EXISTS(DT_INST_CHILD(n, ports)),                                       \
+		(DT_CHILD(DT_INST_CHILD(n, ports), port_##pid)), (DT_INST_CHILD(n, port_##pid)))
+
+/* pid = 0 means port_0 or port (without id). It works for both cases */
+#define DT_INST_PORT_BY_ID(n, pid)                                                                 \
+	COND_CODE_1(DT_NODE_EXISTS(_DT_INST_PORT_BY_ID(n, pid)),                                   \
+		(_DT_INST_PORT_BY_ID(n, pid)), (DT_INST_CHILD(n, port)))
+
+#define _DT_INST_ENDPOINT_BY_ID(n, pid, eid) DT_CHILD(DT_INST_PORT_BY_ID(n, pid), endpoint_##eid)
+
+/* pid/eid = 0 means port_0/endpoint_0 or port/endpoint (without id) */
+#define DT_INST_ENDPOINT_BY_ID(n, pid, eid)                                                        \
+	COND_CODE_1(DT_NODE_EXISTS(_DT_INST_ENDPOINT_BY_ID(n, pid, eid)),                          \
+		(_DT_INST_ENDPOINT_BY_ID(n, pid, eid)),                                            \
+			(DT_CHILD(DT_INST_PORT_BY_ID(n, pid), endpoint)))
+
+/* Get node id of the device from its local endpoint node id */
+#define _DT_NODE_BY_ENDPOINT(ep)                                                                   \
+	COND_CODE_1(DT_NODE_EXISTS(DT_CHILD(DT_PARENT(DT_GPARENT(ep)), ports)),                    \
+		(DT_PARENT(DT_GPARENT(ep))), (DT_GPARENT(ep)))
+
+/* Get remote device object from the local endpoint node id */
+#define DEVICE_DT_GET_REMOTE_DEVICE(ep)                                                            \
+	DEVICE_DT_GET(                                                                             \
+		_DT_NODE_BY_ENDPOINT(DT_NODELABEL(DT_STRING_TOKEN(ep, remote_endpoint_label))))
+
+/**
  * @brief video_endpoint_id enum
  *
  * Identify the video device endpoint.
