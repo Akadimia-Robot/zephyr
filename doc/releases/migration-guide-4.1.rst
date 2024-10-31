@@ -49,6 +49,9 @@ LVGL
 Device Drivers and Devicetree
 *****************************
 
+* The :c:func:`video_buffer_alloc` and :c:func:`video_buffer_aligned_alloc` functions in the
+  video API now take an additional timeout parameter.
+
 Controller Area Network (CAN)
 =============================
 
