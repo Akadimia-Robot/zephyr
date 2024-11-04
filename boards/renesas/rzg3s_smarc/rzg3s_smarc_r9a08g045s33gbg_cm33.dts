@@ -19,6 +19,8 @@
 	chosen {
 		zephyr,sram = &sram_mcpu0;
 		zephyr,flash = &spi_flash;
+		zephyr,console = &scif1;
+		zephyr,shell-uart = &scif1;
 	};
 
 	ddr: memory@60000000 {
@@ -43,4 +45,11 @@
 		reg = <0x80200000 DT_SIZE_K(256)>;
 	};
 
+};
+
+&scif1 {
+	current-speed = <115200>;
+	pinctrl-0 = <&scif1_pins>;
+	pinctrl-names = "default";
+	status = "okay";
 };
