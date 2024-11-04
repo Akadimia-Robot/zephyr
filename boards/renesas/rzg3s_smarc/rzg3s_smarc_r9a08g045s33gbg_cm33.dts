@@ -10,6 +10,7 @@
 #include <zephyr/dt-bindings/memory-attr/memory-attr-arm.h>
 
 #include <arm/renesas/rz/rzg/r9a08g045.dtsi>
+#include "rzg3s_smarc-pinctrl.dtsi"
 
 / {
 	model = "Renesas RZ/G3S SMARC";
