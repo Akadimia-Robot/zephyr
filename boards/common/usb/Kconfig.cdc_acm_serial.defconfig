@@ -2,6 +2,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+config BOARD_NEED_SERIAL_BACKEND_CDC_ACM
+	default y
+
 if BOARD_SERIAL_BACKEND_CDC_ACM
 
 config SERIAL
