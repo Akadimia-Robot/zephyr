@@ -45,6 +45,7 @@ BUILD_ASSERT(sizeof(struct sockaddr) <= CONFIG_MCUMGR_TRANSPORT_NETBUF_USER_DATA
 #define IS_THREAD_RUNNING(thread)					\
 	(thread.base.thread_state & (_THREAD_PENDING |			\
 				     _THREAD_SUSPENDED |		\
+				     _THREAD_SLEEPING |			\
 				     _THREAD_QUEUED) ? true : false)
 
 enum proto_type {
