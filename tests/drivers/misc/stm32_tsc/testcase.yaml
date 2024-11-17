@@ -1,0 +1,10 @@
+tests:
+  drivers.misc.stm32_tsc:
+    tags: drivers misc stm32 tsc
+    filter: dt_compat_enabled("st,stm32-tsc")
+    depends_on: tsc
+  drivers.misc.stm32_tsc_poll:
+    tags: drivers misc stm32 tsc poll
+    filter: dt_compat_enabled("st,stm32-tsc")
+    depends_on: tsc
+    extra_args: CONFIG_STM32_TSC_INTERRUPT=n
