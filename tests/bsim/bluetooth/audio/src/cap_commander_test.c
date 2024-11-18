@@ -101,6 +101,16 @@ static void cap_discovery_complete_cb(struct bt_conn *conn, int err,
 }
 
 #if defined(CONFIG_BT_VCP_VOL_CTLR)
+static void cap_volume_changed_fail_cb(struct bt_conn *conn, int err)
+{
+	if (err != -ECANCELED) {
+		FAIL("CAP command not cancelled for conn %p: %d\n", conn, err);
+		return;
+	}
+
+	SET_FLAG(flag_volume_changed);
+}
+
 static void cap_volume_changed_cb(struct bt_conn *conn, int err)
 {
 	if (err != 0) {
@@ -811,8 +821,7 @@ static void discover_mics(size_t acceptor_cnt)
 		}
 	}
 }
-
-static void test_change_volume(void)
+static int init_change_volume(void)
 {
 	union bt_cap_set_member members[CONFIG_BT_MAX_CONN];
 	const struct bt_cap_commander_change_volume_param param = {
@@ -824,7 +833,6 @@ static void test_change_volume(void)
 	int err;
 
 	printk("Changing volume to %u\n", param.volume);
-	UNSET_FLAG(flag_volume_changed);
 
 	for (size_t i = 0U; i < param.count; i++) {
 		param.members[i].member = connected_conns[i];
@@ -833,11 +841,19 @@ static void test_change_volume(void)
 	err = bt_cap_commander_change_volume(&param);
 	if (err != 0) {
 		FAIL("Failed to change volume: %d\n", err);
-		return;
+		return err;
 	}
+	return param.volume;
+}
+static void test_change_volume(void)
+{
+	int new_volume;
 
+	UNSET_FLAG(flag_volume_changed);
+	new_volume = init_change_volume();
 	WAIT_FOR_FLAG(flag_volume_changed);
-	printk("Volume changed to %u\n", param.volume);
+
+	printk("Volume changed to %u\n", new_volume);
 }
 
 static void test_change_volume_mute(bool mute)
@@ -1026,6 +1042,18 @@ static void test_broadcast_reception_stop(size_t acceptor_count)
 	WAIT_FOR_FLAG(flag_broadcast_reception_stop);
 }
 
+static void test_cancel(bool cap_in_progress)
+{
+	const int expected_err = cap_in_progress ? 0 : -EALREADY;
+	int err;
+
+	err = bt_cap_commander_cancel();
+	if (err != expected_err) {
+		FAIL("Could not cancel CAP command: %d\n", err);
+		return;
+	}
+}
+
 static void test_main_cap_commander_capture_and_render(void)
 {
 	const size_t acceptor_cnt = get_dev_cnt() - 1; /* Assume all other devices are acceptors
@@ -1117,6 +1145,56 @@ static void test_main_cap_commander_broadcast_reception(void)
 	PASS("Broadcast reception passed\n");
 }
 
+static void test_main_cap_commander_cancel(void)
+{
+	size_t acceptor_count;
+
+	/* The test consists of N devices
+	 * 1 device is the broadcast source
+	 * 1 device is the CAP commander
+	 * This leaves N - 2 devices for the acceptor
+	 */
+	acceptor_count = get_dev_cnt() - 1;
+	printk("Acceptor count: %d\n", acceptor_count);
+
+	init(acceptor_count);
+
+	for (size_t i = 0U; i < acceptor_count; i++) {
+		scan_and_connect();
+
+		WAIT_FOR_FLAG(flag_mtu_exchanged);
+	}
+
+	/* TODO: We should use CSIP to find set members */
+	discover_cas(acceptor_count);
+
+	if (IS_ENABLED(CONFIG_BT_CSIP_SET_COORDINATOR)) {
+		if (IS_ENABLED(CONFIG_BT_VCP_VOL_CTLR)) {
+			/* As a result of the cancel command the callback is called with err ==
+			 * -ECANCELED so we can not use the default callback
+			 */
+			cap_cb.volume_changed = cap_volume_changed_fail_cb;
+
+			discover_vcs(acceptor_count);
+
+			init_change_volume();
+
+			test_cancel(true);
+			WAIT_FOR_FLAG(flag_volume_changed);
+		}
+	}
+
+	test_cancel(false);
+
+	/* Disconnect all CAP acceptors */
+	disconnect_acl(acceptor_count);
+
+	/* restore the default callback */
+	cap_cb.volume_changed = cap_volume_changed_cb;
+
+	PASS("Broadcast reception passed\n");
+}
+
 static const struct bst_test_instance test_cap_commander[] = {
 	{
 		.test_id = "cap_commander_capture_and_render",
@@ -1129,6 +1207,12 @@ static const struct bst_test_instance test_cap_commander[] = {
 		.test_post_init_f = test_init,
 		.test_tick_f = test_tick,
 		.test_main_f = test_main_cap_commander_broadcast_reception,
+	},
+	{
+		.test_id = "cap_commander_cancel",
+		.test_post_init_f = test_init,
+		.test_tick_f = test_tick,
+		.test_main_f = test_main_cap_commander_cancel,
 	},
 	BSTEST_END_MARKER,
 };

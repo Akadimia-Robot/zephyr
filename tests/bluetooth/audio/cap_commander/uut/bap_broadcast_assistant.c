@@ -9,6 +9,16 @@
 
 static sys_slist_t broadcast_assistant_cbs = SYS_SLIST_STATIC_INIT(&broadcast_assistant_cbs);
 
+/* when > 0 immediately return from the add_src callback the specified number of times
+ * This allows us to test the CAP cancel command
+ */
+static int add_src_skip;
+
+void set_skip_add_src(int setting)
+{
+	add_src_skip = setting;
+}
+
 struct bap_broadcast_assistant_recv_state_info {
 	uint8_t src_id;
 	/** Cached PAST available */
@@ -82,6 +92,12 @@ int bt_bap_broadcast_assistant_add_src(struct bt_conn *conn,
 	struct bap_broadcast_assistant_instance *inst;
 	struct bt_bap_scan_delegator_recv_state state;
 	struct bt_bap_broadcast_assistant_cb *listener, *next;
+
+	if (add_src_skip != 0) {
+		add_src_skip--;
+
+		return 0;
+	}
 
 	/* Note that proper parameter checking is done in the caller */
 	zassert_not_null(conn, "conn is NULL");
