@@ -332,6 +332,75 @@ options.
 This executable can be instrumented using standard tools, such as gdb or
 valgrind.
 
+.. _gs_multi_user_environment:
+
+Zephyr SDK Installation in Multi-User Environments
+**************************************************
+
+Manual Installation
+===================
+
+In multi-user environments, such as common and distributed build infrastructure, it can be
+advantageous to install the Zephyr SDK and Python dependencies in a shared location.
+
+This has several benefits:
+
+* Reduced disk space used compared to multiple Zephyr SDKs and Python virtual environments
+* Reduced on-boarding time for new Zephyr developers
+* Simplified installation onto neighboring build machines (local and remote)
+* Supports multiple simultaneous installations of different SDK versions side-by-side
+
+Assumptions:
+
+* A UNIX-like operating system (e.g. Linux, macOS)
+* The installer has super-user privileges (e.g. with ``sudo``)
+* The version of the Zephyr SDK installed is represented by ``$VERSION`` (e.g. 0.17.0)
+* The shared installation location is ``/opt/zephyr/sdk/$VERSION``
+
+The same steps in :ref:`Getting Started Guide <getting_started>` are followed
+with minor variations.
+
+1. Create the shared directory and set the owner to the current user
+
+   .. code-block:: console
+
+      sudo mkdir -p /opt/zephyr/sdk/$VERSION
+      sudo chown $UID:$UID /opt/zephyr/sdk/$VERSION
+
+2. Create a shared Python virtual environment (in :ref:`this step <gs_python_deps>`)
+
+   .. code-block:: console
+
+      python3 -m venv /opt/zephyr/sdk/$VERSION/venv
+      source /opt/zephyr/sdk/$VERSION/venv/bin/activate
+
+3. Install the Zephyr SDK (in :ref:`this step <gs_install_zephyr_sdk>`)
+
+   .. code-block:: console
+
+      west sdk install -d /opt/zephyr/sdk/$VERSION
+
+4. Change the owner to root
+
+   .. code-block:: console
+
+      sudo chown -R 0:0 /opt/zephyr/sdk/$VERSION
+
+When opening a new as a new or existing user, export the necessary environment
+variables before building Zephyr as usual.
+
+   .. code-block:: console
+
+      cd ~/zephyrproject/zephyr
+      source /opt/zephyr/sdk/$VERSION/venv/bin/activate
+      export ZEPHYR_BASE=$PWD
+      export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
+      export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr/sdk/$VERSION
+
+Depending on the topology of build infrastructure, it may be preferable to simply ``rsync``
+the ``/opt/zephyr/sdk/$VERSION`` directory to neighboring build machines. Alternatively, use
+``/opt/zephyr/sdk/$VERSION`` to create packages using the package manager of choice.
+
 .. rubric:: Footnotes
 
 .. [#pip]
