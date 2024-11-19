@@ -376,7 +376,6 @@ out:
 	return 0;
 }
 
-#ifdef CONFIG_PM_DEVICE
 static int intel_adsp_gpdma_power_off(const struct device *dev)
 {
 	LOG_INF("%s: power off", dev->name);
@@ -392,7 +391,6 @@ static int intel_adsp_gpdma_power_off(const struct device *dev)
 	return 0;
 #endif /* CONFIG_SOC_SERIES_INTEL_ADSP_ACE */
 }
-#endif /* CONFIG_PM_DEVICE */
 
 int intel_adsp_gpdma_get_status(const struct device *dev, uint32_t channel, struct dma_status *stat)
 {
@@ -440,31 +438,6 @@ static inline void ace_gpdma_intc_unmask(void)
 static inline void ace_gpdma_intc_unmask(void) {}
 #endif
 
-
-int intel_adsp_gpdma_init(const struct device *dev)
-{
-	struct dw_dma_dev_data *const dev_data = dev->data;
-
-	/* Setup context and atomics for channels */
-	dev_data->dma_ctx.magic = DMA_MAGIC;
-	dev_data->dma_ctx.dma_channels = DW_MAX_CHAN;
-	dev_data->dma_ctx.atomic = dev_data->channels_atomic;
-
-	ace_gpdma_intc_unmask();
-
-#if CONFIG_PM_DEVICE && CONFIG_SOC_SERIES_INTEL_ADSP_ACE
-	if (pm_device_on_power_domain(dev)) {
-		pm_device_init_off(dev);
-	} else {
-		pm_device_init_suspended(dev);
-	}
-
-	return 0;
-#else
-	return intel_adsp_gpdma_power_on(dev);
-#endif
-}
-#ifdef CONFIG_PM_DEVICE
 static int gpdma_pm_action(const struct device *dev, enum pm_device_action action)
 {
 	switch (action) {
@@ -485,7 +458,19 @@ static int gpdma_pm_action(const struct device *dev, enum pm_device_action actio
 
 	return 0;
 }
-#endif
+
+int intel_adsp_gpdma_init(const struct device *dev)
+{
+	struct dw_dma_dev_data *const dev_data = dev->data;
+
+	/* Setup context and atomics for channels */
+	dev_data->dma_ctx.magic = DMA_MAGIC;
+	dev_data->dma_ctx.dma_channels = DW_MAX_CHAN;
+	dev_data->dma_ctx.atomic = dev_data->channels_atomic;
+
+	ace_gpdma_intc_unmask();
+	return pm_device_driver_init(dev, gpdma_pm_action);
+}
 
 static const struct dma_driver_api intel_adsp_gpdma_driver_api = {
 	.config = intel_adsp_gpdma_config,
