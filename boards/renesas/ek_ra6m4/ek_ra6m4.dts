@@ -79,3 +79,11 @@
 	div = <2>;
 	status = "okay";
 };
+
+&pwm1 {
+	pinctrl-0 = <&pwm1_default>;
+	pinctrl-names = "default";
+	interrupts = <40 1>, <41 1>;
+	interrupt-names = "gtioca", "overflow";
+	status = "okay";
+};

@@ -88,6 +88,8 @@ The below features are currently supported on Zephyr OS for EK-RA6M2 board:
 +-----------+------------+----------------------+
 | CLOCK     | on-chip    | clock control        |
 +-----------+------------+----------------------+
+| PWM       | on-chip    | pwm                  |
++-----------+------------+----------------------+
 
 Other hardware features are currently not supported by the port.
 

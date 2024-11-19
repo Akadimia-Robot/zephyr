@@ -16,4 +16,12 @@
 			drive-strength = "medium";
 		};
 	};
+
+	pwm0_default: pwm0_default {
+		group1 {
+			/* GTIOC0A GTIOC0B */
+			psels = <RA_PSEL(RA_PSEL_GPT1, 4, 8)>,
+				<RA_PSEL(RA_PSEL_GPT1, 4, 7)>;
+		};
+	};
 };

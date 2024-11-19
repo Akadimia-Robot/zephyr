@@ -85,6 +85,8 @@ The below features are currently supported on Zephyr OS for FPB-RA6E2 board:
 +-----------+------------+----------------------+
 | UART      | on-chip    | serial               |
 +-----------+------------+----------------------+
+| PWM       | on-chip    | pwm                  |
++-----------+------------+----------------------+
 
 Other hardware features are currently not supported by the port.
 
