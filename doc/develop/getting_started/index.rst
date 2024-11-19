@@ -379,6 +379,8 @@ additional Python dependencies in a `Python virtual environment`_.
 
             pip install -r %HOMEPATH%\zephyrproject\zephyr\scripts\requirements.txt
 
+.. _gs_install_zephyr_sdk:
+
 Install the Zephyr SDK
 **********************
 
