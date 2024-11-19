@@ -401,6 +401,58 @@ Depending on the topology of build infrastructure, it may be preferable to simpl
 the ``/opt/zephyr/sdk/$VERSION`` directory to neighboring build machines. Alternatively, use
 ``/opt/zephyr/sdk/$VERSION`` to create packages using the package manager of choice.
 
+.. _gs_package_managers:
+
+Guidelines for Package Managers
+===============================
+
+For those who wish to create redistributable packages (e.g.
+`APT <https://en.wikipedia.org/wiki/APT_(software)>`_ or
+`RPM <https://en.wikipedia.org/wiki/RPM_Package_Manager>`_ ) from the Zephyr SDK and Python
+dependencies, please follow the general guidelines below. These guidelines support multiple
+simultaneous installations of different SDK versions side-by-side, which can be helpful when
+building for different Zephyr releases or when evaluating new Zephyr SDK releases.
+
+Assumptions:
+
+* A UNIX-like operating system (e.g. Linux, macOS)
+* The shared installation location is ``/opt/zephyr/sdk/$VERSION``
+* The version of the Zephyr SDK installed is represented by ``$VERSION`` (e.g. 0.17.0)
+* A Zephyr toolchain component by target architecture is represented by ``$TARGET`` (e.g. ``aarch64``)
+
+Suggested packages:
+
+* ``zephyr-sdk-$VERSION``:
+
+  * a top-level package that pulls in other all other packages for a given Zephyr SDK release
+  * does not install any files directly
+  * optional, but recommended for ease of use
+
+* ``zephyr-sdk-$VERSION-base``:
+
+  * the base layout for the installed Zephyr SDK version
+  * includes files under ``/opt/zephyr/sdk/$VERSION``
+  * limited to cmake rules, scripts, version files, etc
+  * does not include toolchain components
+  * does not include host tools
+  * does not include Python virtual environment
+
+* ``zephyr-sdk-$VERSION-pyenv``:
+
+  * the tree structure under ``/opt/zephyr/sdk/$VERSION/venv``
+  * a time-based snapshot of all required python packages for a given Zephyr SDK version
+
+* ``zephyr-sdk-$VERSION-hosttools``:
+
+  * the host tools for the installed Zephyr SDK version (if applicable)
+  * includes files under ``/opt/zephyr/sdk/$VERSION/sysroots``
+  * for hosts without complete host tools support, this package may be empty
+
+* ``zephyr-sdk-$VERSION-toolchain-$TARGET``:
+
+  * the ``$TARGET``-specific toolchain component of Zephyr SDK ``$VERSION``
+  * includes files under e.g. ``/opt/zephyr/sdk/$VERSION/$TARGET-zephyr-elf``
+
 .. rubric:: Footnotes
 
 .. [#pip]
