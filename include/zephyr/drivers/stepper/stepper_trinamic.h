@@ -131,6 +131,7 @@ struct tmc_ramp_generator_data {
  *
  * @return struct tmc_ramp_generator_data
  */
+#ifdef CONFIG_STEPPER_ADI_TMC5041
 #define TMC_RAMP_DT_SPEC_GET(node)						\
 	{									\
 		.vstart = DT_PROP(node, vstart),				\
@@ -148,6 +149,7 @@ struct tmc_ramp_generator_data {
 			     TMC5041_IHOLD(DT_PROP(node, ihold)) |		\
 			     TMC5041_IHOLDDELAY(DT_PROP(node, iholddelay))),	\
 	}
+#endif
 
 /**
  * @brief Configure Trinamic Stepper Ramp Generator
@@ -159,8 +161,10 @@ struct tmc_ramp_generator_data {
  * @retval -ENOSYS If not implemented by device driver
  * @retval 0 Success
  */
+#ifdef CONFIG_STEPPER_ADI_TMC5041
 int tmc5041_stepper_set_ramp(const struct device *dev,
 			     const struct tmc_ramp_generator_data *ramp_data);
+#endif
 
 /**
  * @}
