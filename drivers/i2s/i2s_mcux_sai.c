@@ -30,7 +30,7 @@
 #include <fsl_edma.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(dev_i2s_mcux, CONFIG_I2S_LOG_LEVEL);
+LOG_MODULE_REGISTER(dev_i2s_nxp_sai, CONFIG_I2S_LOG_LEVEL);
 
 #define NUM_DMA_BLOCKS_RX_PREP 3
 #if defined(CONFIG_DMA_MCUX_EDMA)
@@ -84,7 +84,7 @@ struct stream {
 	struct k_msgq out_queue;
 };
 
-struct i2s_mcux_config {
+struct i2s_nxp_sai_config {
 	I2S_Type *base;
 	uint32_t clk_src;
 	uint32_t clk_pre_div;
@@ -139,7 +139,7 @@ static void i2s_tx_stream_disable(const struct device *dev, bool drop)
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->tx;
 	const struct device *dev_dma = dev_data->dev_dma;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 
 	LOG_DBG("Stopping DMA channel %u for TX stream", strm->dma_channel);
 
@@ -174,7 +174,7 @@ static void i2s_rx_stream_disable(const struct device *dev, bool in_drop, bool o
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->rx;
 	const struct device *dev_dma = dev_data->dev_dma;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 
 	LOG_DBG("Stopping RX stream & DMA channel %u", strm->dma_channel);
 	dma_stop(dev_dma, strm->dma_channel);
@@ -203,7 +203,7 @@ static void i2s_rx_stream_disable(const struct device *dev, bool in_drop, bool o
 static int i2s_tx_reload_multiple_dma_blocks(const struct device *dev, uint8_t *blocks_queued)
 {
 	struct i2s_dev_data *dev_data = dev->data;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	struct stream *strm = &dev_data->tx;
 	void *buffer = NULL;
@@ -334,7 +334,7 @@ static void i2s_dma_rx_callback(const struct device *dma_dev, void *arg, uint32_
 				int status)
 {
 	struct device *dev = (struct device *)arg;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->rx;
@@ -402,7 +402,7 @@ static void i2s_dma_rx_callback(const struct device *dma_dev, void *arg, uint32_
 
 static void enable_mclk_direction(const struct device *dev, bool dir)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	uint32_t offset = dev_cfg->mclk_pin_offset;
 	uint32_t mask = dev_cfg->mclk_pin_mask;
 	uint32_t *gpr = (uint32_t *)(DT_REG_ADDR(DT_NODELABEL(iomuxcgpr)) + offset);
@@ -416,7 +416,7 @@ static void enable_mclk_direction(const struct device *dev, bool dir)
 
 static void get_mclk_rate(const struct device *dev, uint32_t *mclk)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	const struct device *ccm_dev = dev_cfg->ccm_dev;
 	clock_control_subsys_t clk_sub_sys = dev_cfg->clk_sub_sys;
 	uint32_t rate = 0;
@@ -431,10 +431,10 @@ static void get_mclk_rate(const struct device *dev, uint32_t *mclk)
 	*mclk = rate;
 }
 
-static int i2s_mcux_config(const struct device *dev, enum i2s_dir dir,
-			   const struct i2s_config *i2s_cfg)
+static int i2s_nxp_sai_config(const struct device *dev, enum i2s_dir dir,
+			      const struct i2s_config *i2s_cfg)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	struct i2s_dev_data *dev_data = dev->data;
 	sai_transceiver_t config;
@@ -670,7 +670,7 @@ static int i2s_mcux_config(const struct device *dev, enum i2s_dir dir,
 	return 0;
 }
 
-const struct i2s_config *i2s_mcux_config_get(const struct device *dev, enum i2s_dir dir)
+const struct i2s_config *i2s_nxp_sai_config_get(const struct device *dev, enum i2s_dir dir)
 {
 	struct i2s_dev_data *dev_data = dev->data;
 
@@ -688,7 +688,7 @@ static int i2s_tx_stream_start(const struct device *dev)
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->tx;
 	const struct device *dev_dma = dev_data->dev_dma;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 
 	/* retrieve buffer from input queue */
@@ -763,7 +763,7 @@ static int i2s_rx_stream_start(const struct device *dev)
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->rx;
 	const struct device *dev_dma = dev_data->dev_dma;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	uint8_t num_of_bufs;
 
@@ -854,7 +854,7 @@ static int i2s_rx_stream_start(const struct device *dev)
 	return 0;
 }
 
-static int i2s_mcux_trigger(const struct device *dev, enum i2s_dir dir, enum i2s_trigger_cmd cmd)
+static int i2s_nxp_sai_trigger(const struct device *dev, enum i2s_dir dir, enum i2s_trigger_cmd cmd)
 {
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm;
@@ -951,14 +951,14 @@ static int i2s_mcux_trigger(const struct device *dev, enum i2s_dir dir, enum i2s
 	return ret;
 }
 
-static int i2s_mcux_read(const struct device *dev, void **mem_block, size_t *size)
+static int i2s_nxp_sai_read(const struct device *dev, void **mem_block, size_t *size)
 {
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->rx;
 	void *buffer;
 	int status, ret = 0;
 
-	LOG_DBG("i2s_mcux_read");
+	LOG_DBG("i2s_nxp_sai_read");
 	if (strm->state == I2S_STATE_NOT_READY) {
 		LOG_ERR("invalid state %d", strm->state);
 		return -EIO;
@@ -980,13 +980,13 @@ static int i2s_mcux_read(const struct device *dev, void **mem_block, size_t *siz
 	return 0;
 }
 
-static int i2s_mcux_write(const struct device *dev, void *mem_block, size_t size)
+static int i2s_nxp_sai_write(const struct device *dev, void *mem_block, size_t size)
 {
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->tx;
 	int ret;
 
-	LOG_DBG("i2s_mcux_write");
+	LOG_DBG("i2s_nxp_sai_write");
 	if (strm->state != I2S_STATE_RUNNING && strm->state != I2S_STATE_READY) {
 		LOG_ERR("invalid state (%d)", strm->state);
 		return -EIO;
@@ -1003,7 +1003,7 @@ static int i2s_mcux_write(const struct device *dev, void *mem_block, size_t size
 
 static void sai_driver_irq(const struct device *dev)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 
 	if ((base->TCSR & I2S_TCSR_FEF_MASK) == I2S_TCSR_FEF_MASK) {
@@ -1028,10 +1028,10 @@ static void sai_driver_irq(const struct device *dev)
 }
 
 /* clear IRQ sources atm */
-static void i2s_mcux_isr(void *arg)
+static void i2s_nxp_sai_isr(void *arg)
 {
 	struct device *dev = (struct device *)arg;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 
 	if ((base->RCSR & I2S_TCSR_FEF_MASK) == I2S_TCSR_FEF_MASK) {
@@ -1054,7 +1054,7 @@ static void i2s_mcux_isr(void *arg)
 static void audio_clock_settings(const struct device *dev)
 {
 	clock_audio_pll_config_t audioPllConfig;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	uint32_t clock_name = (uint32_t)dev_cfg->clk_sub_sys;
 
 	/*Clock setting for SAI*/
@@ -1080,9 +1080,9 @@ static void audio_clock_settings(const struct device *dev)
 	CLOCK_InitAudioPll(&audioPllConfig);
 }
 
-static int i2s_mcux_initialize(const struct device *dev)
+static int i2s_nxp_sai_initialize(const struct device *dev)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	struct i2s_dev_data *dev_data = dev->data;
 	uint32_t mclk;
@@ -1148,20 +1148,20 @@ static int i2s_mcux_initialize(const struct device *dev)
 	return 0;
 }
 
-static const struct i2s_driver_api i2s_mcux_driver_api = {
-	.configure = i2s_mcux_config,
-	.read = i2s_mcux_read,
-	.write = i2s_mcux_write,
-	.config_get = i2s_mcux_config_get,
-	.trigger = i2s_mcux_trigger,
+static const struct i2s_driver_api i2s_nxp_sai_driver_api = {
+	.configure = i2s_nxp_sai_config,
+	.read = i2s_nxp_sai_read,
+	.write = i2s_nxp_sai_write,
+	.config_get = i2s_nxp_sai_config_get,
+	.trigger = i2s_nxp_sai_trigger,
 };
 
-#define I2S_MCUX_INIT(i2s_id)                                                                      \
+#define i2s_nxp_sai_INIT(i2s_id)                                                                   \
 	static void i2s_irq_connect_##i2s_id(const struct device *dev);                            \
                                                                                                    \
 	PINCTRL_DT_INST_DEFINE(i2s_id);                                                            \
                                                                                                    \
-	static const struct i2s_mcux_config i2s_##i2s_id##_config = {                              \
+	static const struct i2s_nxp_sai_config i2s_##i2s_id##_config = {                           \
 		.base = (I2S_Type *)DT_INST_REG_ADDR(i2s_id),                                      \
 		.clk_src = DT_INST_PROP(i2s_id, clock_mux),                                        \
 		.clk_pre_div = DT_INST_PROP(i2s_id, pre_div),                                      \
@@ -1225,16 +1225,16 @@ static const struct i2s_driver_api i2s_mcux_driver_api = {
 			},                                                                         \
 	};                                                                                         \
                                                                                                    \
-	DEVICE_DT_INST_DEFINE(i2s_id, &i2s_mcux_initialize, NULL, &i2s_##i2s_id##_data,            \
+	DEVICE_DT_INST_DEFINE(i2s_id, &i2s_nxp_sai_initialize, NULL, &i2s_##i2s_id##_data,         \
 			      &i2s_##i2s_id##_config, POST_KERNEL, CONFIG_I2S_INIT_PRIORITY,       \
-			      &i2s_mcux_driver_api);                                               \
+			      &i2s_nxp_sai_driver_api);                                            \
                                                                                                    \
 	static void i2s_irq_connect_##i2s_id(const struct device *dev)                             \
 	{                                                                                          \
 		IRQ_CONNECT(DT_INST_IRQ_BY_IDX(i2s_id, 0, irq),                                    \
-			    DT_INST_IRQ_BY_IDX(i2s_id, 0, priority), i2s_mcux_isr,                 \
+			    DT_INST_IRQ_BY_IDX(i2s_id, 0, priority), i2s_nxp_sai_isr,              \
 			    DEVICE_DT_INST_GET(i2s_id), 0);                                        \
 		irq_enable(DT_INST_IRQN(i2s_id));                                                  \
 	}
 
-DT_INST_FOREACH_STATUS_OKAY(I2S_MCUX_INIT)
+DT_INST_FOREACH_STATUS_OKAY(i2s_nxp_sai_INIT)
