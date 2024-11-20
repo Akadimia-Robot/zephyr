@@ -61,6 +61,7 @@ struct udc_stm32_config {
 	uint32_t dram_size;
 	uint16_t ep0_mps;
 	uint16_t ep_mps;
+	int speed_idx;
 };
 
 enum udc_stm32_msg_kind {
@@ -912,6 +913,7 @@ static const struct udc_stm32_config udc0_cfg = {
 	.pma_offset = USB_BTABLE_SIZE,
 	.ep0_mps = EP0_MPS,
 	.ep_mps = EP_MPS,
+	.speed_idx = DT_ENUM_IDX(DT_DRV_INST(0), maximum_speed),
 };
 
 #if defined(USB_OTG_FS) || defined(USB_OTG_HS)
@@ -1204,6 +1206,9 @@ static int udc_stm32_driver_init0(const struct device *dev)
 	data->caps.rwup = true;
 	data->caps.out_ack = false;
 	data->caps.mps0 = UDC_MPS0_64;
+	if (cfg->speed_idx == 2) {
+		data->caps.hs = true;
+	}
 
 	priv->dev = dev;
 	priv->irq = UDC_STM32_IRQ;
