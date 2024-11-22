@@ -9,6 +9,10 @@ simulation_id="l2cap_stress"
 verbosity_level=2
 EXECUTE_TIMEOUT=240
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 bsim_exe=./bs_${BOARD_TS}_tests_bsim_bluetooth_host_l2cap_stress_prj_conf
 
 cd ${BSIM_OUT_PATH}/bin

@@ -9,6 +9,10 @@ verbosity_level=2
 
 simulation_id="security_bond_per_connection"
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 central_exe="${BSIM_OUT_PATH}/bin/bs_${BOARD_TS}_$(guess_test_long_name)_prj_conf"
 peripheral_exe="${central_exe}"
 

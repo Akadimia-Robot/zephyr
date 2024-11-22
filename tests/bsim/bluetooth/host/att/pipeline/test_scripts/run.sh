@@ -4,6 +4,10 @@
 
 source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 dut_exe="bs_${BOARD_TS}_tests_bsim_bluetooth_host_att_pipeline_dut_prj_conf"
 tester_exe="bs_${BOARD_TS}_tests_bsim_bluetooth_host_att_pipeline_tester_prj_conf"
 

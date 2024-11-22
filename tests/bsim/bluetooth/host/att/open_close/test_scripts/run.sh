@@ -7,6 +7,10 @@ set -eu
 source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 
 test_path=$(guess_test_long_name)
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 dev_exe="bs_${BOARD_TS}_${test_path}_prj_conf"
 simulation_id="${test_path}"
 

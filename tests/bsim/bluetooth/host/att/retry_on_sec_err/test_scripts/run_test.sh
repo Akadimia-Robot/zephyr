@@ -8,6 +8,10 @@ source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 
 simulation_id="retry_on_sec_err"
 verbosity_level=2
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 test_exe_d0="./bs_${BOARD_TS}_$(guess_test_long_name)_client_prj_conf"
 test_exe_d1="./bs_${BOARD_TS}_$(guess_test_long_name)_server_prj_conf"
 

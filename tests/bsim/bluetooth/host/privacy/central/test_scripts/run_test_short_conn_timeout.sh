@@ -12,6 +12,10 @@ verbosity_level=2
 # timeout is shorter than the connection establishment timeout
 simulation_id="test_central_connect_fails_with_short_rpa_timeout"
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 central_exe="${BSIM_OUT_PATH}/bin/bs_${BOARD_TS}_$(guess_test_long_name)_prj_conf"
 
 cd ${BSIM_OUT_PATH}/bin

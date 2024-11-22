@@ -8,9 +8,9 @@ project(app)
 add_subdirectory(${ZEPHYR_BASE}/tests/bluetooth/common/testlib testlib)
 
 target_sources(app PRIVATE
-  bs_main.c
-  bs_sync.c
-  main.c
+  src/bs_main.c
+  src/bs_sync.c
+  src/main.c
 )
 
 zephyr_include_directories(

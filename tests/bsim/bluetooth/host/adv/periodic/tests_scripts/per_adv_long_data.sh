@@ -13,6 +13,10 @@ EXECUTE_TIMEOUT=60
 
 cd ${BSIM_OUT_PATH}/bin
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_adv_periodic_prj_long_data_conf \
   -v=${verbosity_level} -s=${simulation_id} -d=0 -RealEncryption=0 \
   -testid=per_adv_long_data_advertiser -rs=23

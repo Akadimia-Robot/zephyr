@@ -7,6 +7,10 @@ source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 simulation_id="att_sequential"
 verbosity_level=2
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 dut_exe="bs_${BOARD_TS}_$(guess_test_long_name)_dut_prj_conf"
 tester_exe="bs_${BOARD_TS}_$(guess_test_long_name)_tester_prj_conf"
 
