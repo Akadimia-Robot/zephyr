@@ -294,7 +294,7 @@ config NXP_88W8801_MURATA_2DS_USD
 	  https://www.murata.com/en-us/products/connectivitymodule/wi-fi-bluetooth/overview/lineup/type2ds
 	  https://www.murata.com/en-us/products/connectivitymodule/wi-fi-bluetooth/overview/lineup/usd-m2-adapter
 
-config NXP_88W8801_MURATA_2DS_USD
+config NXP_88W8801_MURATA_2DS_M2
 	bool "NXP MURATA-2DS-M2"
 	help
 	  Murata Type 2DS is a small high-performance module (integrated PCB antenna)
@@ -316,7 +316,7 @@ menu "Wi-Fi driver Stack configurations"
 
 config NXP_WIFI_MON_TASK_STACK_SIZE
 	int "Mon thread stack size"
-	default 1152
+	default 3072
 	help
 	  This option specifies the size of the stack used by the mon task.
 
@@ -328,7 +328,7 @@ config NXP_WIFI_WLCMGR_TASK_STACK_SIZE
 
 config NXP_WIFI_POWERSAVE_TASK_STACK_SIZE
 	int "Wifi powersave task stack size"
-	default 512
+	default 1024
 	help
 	  This option specifies the size of the stack used by the wifi powersave task.
 
@@ -350,6 +350,24 @@ config NXP_WIFI_SCAN_TASK_STACK_SIZE
 	default 2048
 	help
 	  This option specifies the size of the stack used by the wifi scan task.
+
+config NXP_WIFI_WPS_TASK_STACK_SIZE
+	int "Wifi WPS task stack size"
+	default 5120
+	help
+	  This option specifies the size of the stack used by the wifi WPS task.
+
+config NXP_WIFI_CORE_TASK_STACK_SIZE
+	int "Wifi core task stack size"
+	default 2048
+	help
+	  This option specifies the size of the stack used by the wifi core task.
+
+config NXP_WIFI_DHCP_SERVER_TASK_STACK_SIZE
+	int "Wifi DHCP server task stack size"
+	default 2048
+	help
+	  This option specifies the size of the stack used by the wifi DHCP server task.
 
 endmenu
 
