@@ -535,6 +535,52 @@ void i2c_stm32_smbalert_disable(const struct device *dev)
 }
 #endif /* CONFIG_SMBUS_STM32 */
 
+#ifdef CONFIG_I2C_DMA
+/* This function is executed in the interrupt context */
+static void dma_rx_callback(const struct device *dma_dev, void *user_data,
+                            uint32_t channel, int status)
+{
+    struct i2c_stm32_data *data = (struct i2c_stm32_data *)user_data;
+
+    switch (status) {
+        case DMA_STATUS_COMPLETE:
+                data->current.is_err = 0;
+				dma_stop(dma_dev, channel);
+                break;
+        case DMA_STATUS_BLOCK:
+                break;
+        default:
+                data->current.is_err = 1;
+                break;
+    }
+
+    k_sem_give(&data->device_sync_sem);
+}
+
+/* This function is executed in the interrupt context */
+static void dma_tx_callback(const struct device *dma_dev, void *user_data,
+                            uint32_t channel, int status)
+{
+    struct i2c_stm32_data *data = (struct i2c_stm32_data *)user_data;
+
+    switch (status) {
+        case DMA_STATUS_COMPLETE:
+                data->current.is_err = 0;
+				dma_stop(dma_dev, channel);
+                break;
+        case DMA_STATUS_BLOCK:
+                break;
+        default:
+                data->current.is_err = 1;
+                break;
+    }
+
+    LOG_DBG("Giving semaphore");
+    k_sem_give(&data->device_sync_sem);
+}
+
+#endif /* CONFIG_I2C_DMA */
+
 /* Macros for I2C instance declaration */
 
 #ifdef CONFIG_I2C_STM32_INTERRUPT
@@ -582,6 +628,46 @@ static void i2c_stm32_irq_config_func_##index(const struct device *dev)	\
 
 #endif /* CONFIG_I2C_STM32_INTERRUPT */
 
+#ifdef CONFIG_I2C_DMA
+
+#define I2C_DMA_INIT(index, dir)                                                                   \
+    .dev_dma_##dir = COND_CODE_1(DT_INST_DMAS_HAS_NAME(index, dir),                                \
+                                 (DEVICE_DT_GET(STM32_DMA_CTLR(index, dir))), (NULL)),             \
+    .dma_##dir##_channel = COND_CODE_1(DT_INST_DMAS_HAS_NAME(index, dir),                          \
+                                       (DT_INST_DMAS_CELL_BY_NAME(index, dir, channel)), (-1)),
+
+#define I2C_DMA_SLOT_INIT(index, dir)                                                              \
+    .dma_slot = COND_CODE_1(DT_INST_DMAS_HAS_NAME(index, dir),                                     \
+                            (DT_INST_DMAS_CELL_BY_NAME(index, dir, slot)), (0))
+
+#define I2C_DMA_CFG_INIT(index, name, dir, src, dest, src_addr_incr, dest_addr_incr)               \
+.dma_##dir##_cfg = {                                                                               \
+    I2C_DMA_SLOT_INIT(index, dir),                                                                 \
+    .channel_direction = STM32_DMA_CONFIG_DIRECTION(STM32_DMA_CHANNEL_CONFIG(index, dir)),         \
+    .source_data_size = STM32_DMA_CONFIG_##src##_DATA_SIZE(                                        \
+                            STM32_DMA_CHANNEL_CONFIG(index, dir)),                                 \
+    .dest_data_size = STM32_DMA_CONFIG_##dest##_DATA_SIZE(                                         \
+                            STM32_DMA_CHANNEL_CONFIG(index, dir)),                                 \
+    .source_burst_length = 1,                                                                      \
+    .dest_burst_length = 1,                                                                        \
+    .channel_priority = STM32_DMA_CONFIG_PRIORITY(STM32_DMA_CHANNEL_CONFIG(index, dir)),           \
+    .dma_callback = dma_##dir##_callback,                                                          \
+},                                                                                                 \
+.dma_##dir##_blk_cfg = {                                                                           \
+            .source_addr_adj = src_addr_incr,                                                      \
+            .dest_addr_adj = dest_addr_incr,                                                       \
+},
+
+#else
+
+#define I2C_DMA_INIT(index, dir)
+
+#define I2C_DMA_SLOT_INIT(index, dir)
+
+#define I2C_DMA_CFG_INIT(index, name, dir, src, dest, src_addr_incr, dest_addr_incr)
+
+#endif
+
 #define STM32_I2C_INIT(index)						\
 STM32_I2C_IRQ_HANDLER_DECL(index);					\
 									\
@@ -607,6 +693,8 @@ static const struct i2c_stm32_config i2c_stm32_cfg_##index = {		\
 	IF_ENABLED(DT_HAS_COMPAT_STATUS_OKAY(st_stm32_i2c_v2),		\
 		(.timings = (const struct i2c_config_timing *) i2c_timings_##index,\
 		 .n_timings = ARRAY_SIZE(i2c_timings_##index),))	\
+	I2C_DMA_INIT(index, tx) \
+	I2C_DMA_INIT(index, rx) \
 };									\
 									\
 static struct i2c_stm32_data i2c_stm32_dev_data_##index;		\
