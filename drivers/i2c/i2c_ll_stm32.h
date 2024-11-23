@@ -15,6 +15,8 @@
 #include <zephyr/drivers/gpio.h>
 #endif /* CONFIG_I2C_STM32_BUS_RECOVERY */
 
+#include <zephyr/drivers/dma.h>
+
 typedef void (*irq_config_func_t)(const struct device *port);
 
 #if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_i2c_v2)
@@ -48,6 +50,12 @@ struct i2c_stm32_config {
 	const struct i2c_config_timing *timings;
 	size_t n_timings;
 #endif
+#ifdef CONFIG_I2C_DMA
+	const struct device *dev_dma_tx;
+	int32_t dma_tx_channel;
+	const struct device *dev_dma_rx;
+	int32_t dma_rx_channel;
+#endif /* CONFIG_I2C_DMA */
 };
 
 struct i2c_stm32_data {
@@ -91,6 +99,14 @@ struct i2c_stm32_data {
 	i2c_stm32_smbalert_cb_func_t smbalert_cb_func;
 	const struct device *smbalert_cb_dev;
 #endif
+#ifdef CONFIG_I2C_DMA
+	struct dma_config dma_tx_cfg;
+	struct dma_block_config dma_tx_blk_cfg;
+	struct k_sem dma_tx_sem;
+	struct dma_config dma_rx_cfg;
+	struct dma_block_config dma_rx_blk_cfg;
+	struct k_sem dma_rx_sem;
+#endif /* CONFIG_I2C_DMA */
 };
 
 int32_t stm32_i2c_transaction(const struct device *dev,
