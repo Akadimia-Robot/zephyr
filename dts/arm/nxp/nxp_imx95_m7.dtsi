@@ -145,7 +145,7 @@
 		};
 
 		lpuart3: serial@42570000 {
-			compatible = "nxp,imx-lpuart", "nxp,kinetis-lpuart";
+			compatible = "nxp,imx-lpuart", "nxp,lpuart";
 			reg = <0x42570000 DT_SIZE_K(64)>;
 			interrupts = <64 3>;
 			clocks = <&scmi_clk IMX95_CLK_LPUART3>;
@@ -153,7 +153,7 @@
 		};
 
 		lpuart4: serial@42580000 {
-			compatible = "nxp,imx-lpuart", "nxp,kinetis-lpuart";
+			compatible = "nxp,imx-lpuart", "nxp,lpuart";
 			reg = <0x42580000 DT_SIZE_K(64)>;
 			interrupts = <65 3>;
 			clocks = <&scmi_clk IMX95_CLK_LPUART4>;
@@ -161,7 +161,7 @@
 		};
 
 		lpuart5: serial@42590000 {
-			compatible = "nxp,imx-lpuart", "nxp,kinetis-lpuart";
+			compatible = "nxp,imx-lpuart", "nxp,lpuart";
 			reg = <0x42590000 DT_SIZE_K(64)>;
 			interrupts = <66 3>;
 			clocks = <&scmi_clk IMX95_CLK_LPUART5>;
@@ -169,7 +169,7 @@
 		};
 
 		lpuart6: serial@425a0000 {
-			compatible = "nxp,imx-lpuart", "nxp,kinetis-lpuart";
+			compatible = "nxp,imx-lpuart", "nxp,lpuart";
 			reg = <0x425a0000 DT_SIZE_K(64)>;
 			interrupts = <67 3>;
 			clocks = <&scmi_clk IMX95_CLK_LPUART6>;
@@ -190,7 +190,7 @@
 		};
 
 		lpuart7: serial@42690000 {
-			compatible = "nxp,imx-lpuart", "nxp,kinetis-lpuart";
+			compatible = "nxp,imx-lpuart", "nxp,lpuart";
 			reg = <0x42690000 DT_SIZE_K(64)>;
 			interrupts = <68 3>;
 			clocks = <&scmi_clk IMX95_CLK_LPUART7>;
@@ -198,7 +198,7 @@
 		};
 
 		lpuart8: serial@426a0000 {
-			compatible = "nxp,imx-lpuart", "nxp,kinetis-lpuart";
+			compatible = "nxp,imx-lpuart", "nxp,lpuart";
 			reg = <0x426a0000 DT_SIZE_K(64)>;
 			interrupts = <69 3>;
 			clocks = <&scmi_clk IMX95_CLK_LPUART8>;
@@ -290,7 +290,7 @@
 		};
 
 		lpuart1: serial@44380000 {
-			compatible = "nxp,imx-lpuart", "nxp,kinetis-lpuart";
+			compatible = "nxp,imx-lpuart", "nxp,lpuart";
 			reg = <0x44380000 DT_SIZE_K(64)>;
 			interrupts = <19 3>;
 			clocks = <&scmi_clk IMX95_CLK_LPUART1>;
@@ -298,7 +298,7 @@
 		};
 
 		lpuart2: serial@44390000 {
-			compatible = "nxp,imx-lpuart", "nxp,kinetis-lpuart";
+			compatible = "nxp,imx-lpuart", "nxp,lpuart";
 			reg = <0x44390000 DT_SIZE_K(64)>;
 			interrupts = <20 3>;
 			clocks = <&scmi_clk IMX95_CLK_LPUART2>;
