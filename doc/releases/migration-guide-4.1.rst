@@ -57,6 +57,11 @@ LVGL
 Device Drivers and Devicetree
 *****************************
 
+ADC
+===
+
+* Renamed the ``compatible`` from ``nxp,kinetis-adc12`` to :dtcompatible:`nxp,adc12`.
+
 Controller Area Network (CAN)
 =============================
 
