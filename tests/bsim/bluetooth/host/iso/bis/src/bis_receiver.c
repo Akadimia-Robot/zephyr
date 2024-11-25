@@ -17,7 +17,7 @@
 #include "babblekit/sync.h"
 #include "babblekit/testcase.h"
 
-LOG_MODULE_REGISTER(bis_receiver, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(bis_receiver, LOG_LEVEL_DBG);
 
 #define PA_SYNC_INTERVAL_TO_TIMEOUT_RATIO 5U /* Set the timeout relative to interval */
 
