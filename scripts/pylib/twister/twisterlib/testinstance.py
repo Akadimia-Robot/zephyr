@@ -6,7 +6,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
-from enum import Enum
 import os
 import hashlib
 import random
@@ -20,7 +19,7 @@ from twisterlib.testsuite import TestCase, TestSuite
 from twisterlib.platform import Platform
 from twisterlib.error import BuildError, StatusAttributeError
 from twisterlib.size_calc import SizeCalculator
-from twisterlib.statuses import TwisterStatus
+from twisterlib.statuses import TwisterStatus, TwisterStatusMachineInstance
 from twisterlib.handlers import (
     Handler,
     SimulationHandler,
@@ -60,6 +59,7 @@ class TestInstance:
         self.execution_time = 0
         self.build_time = 0
         self.retries = 0
+        self.instance_status_machine = TwisterStatusMachineInstance()
 
         self.name = os.path.join(platform.name, testsuite.name)
         self.dut = None
@@ -99,15 +99,18 @@ class TestInstance:
 
     @property
     def status(self) -> TwisterStatus:
-        return self._status
+        if self._status != str(self.instance_status_machine.current_state):
+            logger.error("exp {} but {}".format(self._status,
+                str(self.instance_status_machine.current_state)))
+        return str(self.instance_status_machine.current_state)
 
     @status.setter
     def status(self, value : TwisterStatus) -> None:
         # Check for illegal assignments by value
         try:
-            key = value.name if isinstance(value, Enum) else value
-            self._status = TwisterStatus[key]
-        except KeyError:
+            self._status = TwisterStatus(value)
+            self.instance_status_machine.trigger(value)
+        except ValueError:
             raise StatusAttributeError(self.__class__, value)
 
     def add_filter(self, reason, filter_type):

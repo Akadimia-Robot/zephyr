@@ -13,6 +13,7 @@ from pathlib import Path
 from twisterlib.error import StatusAttributeError
 from twisterlib.error import ConfigurationError
 from twisterlib.harness import Test
+from twisterlib.statuses import TwisterStatus
 
 
 def test_configurationerror():
@@ -28,8 +29,8 @@ def test_configurationerror():
 def test_status_value_error():
     harness = Test()
 
-    expected_err = 'Test assigned status None,' \
+    expected_err = 'Test assigned status OK,' \
                    ' which could not be cast to a TwisterStatus.'
 
     with pytest.raises(StatusAttributeError, match=expected_err):
-        harness.status = None
+        harness.status = "OK"
