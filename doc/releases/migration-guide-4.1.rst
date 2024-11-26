@@ -116,6 +116,11 @@ Pin Control
   * Renamed the ``compatible`` from ``nxp,kinetis-pinctrl`` to :dtcompatible:`nxp,port-pinctrl`.
   * Renamed the ``compatible`` from ``nxp,kinetis-pinmux`` to :dtcompatible:`nxp,port-pinmux`.
 
+PWM
+===
+
+* Renamed the ``compatible`` from ``nxp,kinetis-ftm-pwm`` to :dtcompatible:`nxp,ftm-pwm`.
+
 Sensors
 =======
 
