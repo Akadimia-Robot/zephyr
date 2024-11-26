@@ -311,7 +311,7 @@ should see the following message in the terminal:
    Hello World! frdm_mcxn947/mcxn947/cpu0
 
 Debugging a dual-core image
---------------------------
+---------------------------
 
 For dual core builds, the secondary core should be placed into a loop,
 then a debugger can be attached.
@@ -344,3 +344,6 @@ Troubleshooting
 
 .. _FRDM-MCXN947 Schematics:
    https://www.nxp.com/webapp/Download?colCode=90818-MCXN947SH
+
+.. _AN13264:
+   https://www.nxp.com/docs/en/application-note/AN13264.pdf
