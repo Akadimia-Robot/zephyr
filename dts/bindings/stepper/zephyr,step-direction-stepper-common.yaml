@@ -1,0 +1,25 @@
+# Copyright (c) 2024 Fabian Blatz <fabianblatz@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+    This binding provides a stepper controller that can be used with a stepper motor that
+    accepts step and direction signals.
+
+include: base.yaml
+
+properties:
+  step-gpios:
+    type: phandle-array
+    description: |
+      The GPIO pins that are used to send step signals to the stepper motor.
+
+  direction-gpios:
+    type: phandle-array
+    description: |
+      The GPIO pins that are used to send direction signals to the stepper motor.
+      Pin will be driven high for forward direction and low for reverse direction.
+
+  dual-edge-step:
+    type: boolean
+    description: |
+      If present, the stepper motor controller supports dual edge step signals.
