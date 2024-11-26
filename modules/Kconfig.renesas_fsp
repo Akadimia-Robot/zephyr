@@ -81,4 +81,14 @@ config USE_RA_FSP_CANFD
 	help
 	  Enable RA FSP CANFD driver
 
+config USE_RA_FSP_DISPLAY
+	bool
+	help
+	  Enable RA FSP Display driver
+
+config USE_RA_FSP_MIPI_DSI
+	bool
+	help
+	  Enable RA FSP MIPI DSI driver
+
 endif # HAS_RENESAS_RA_FSP
