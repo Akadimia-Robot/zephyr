@@ -12,9 +12,12 @@
 
 struct video_device;
 
+struct video_ctrl_handler;
+
 struct video_notifier {
 	struct video_device *vdev;
 	const struct device *dev;
+	struct video_ctrl_handler *ctrl_handler;
 	struct video_notifier *parent;
 	const struct device **children_devs;
 	uint8_t children_num;
@@ -22,8 +25,8 @@ struct video_notifier {
 };
 
 void video_async_init(struct video_notifier *notifier, const struct device *dev,
-		      struct video_device *vdev, const struct device **children_devs,
-		      uint8_t children_num);
+		      struct video_device *vdev, struct video_ctrl_handler *hdl,
+		      const struct device **children_devs, uint8_t children_num);
 
 int video_async_register(struct video_notifier *notifier);
 

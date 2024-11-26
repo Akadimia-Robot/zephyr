@@ -40,6 +40,7 @@ int video_register_vdev(struct video_device *vdev, const struct device *dev)
 	}
 
 	vdev->dev = dev;
+	video_ctrl_handler_init(&vdev->ctrl_handler, dev);
 
 	for (i = 0; i < VIDEO_NUM_DEVICES; ++i) {
 		if (!video_devices[i]) {
@@ -68,6 +69,7 @@ void video_unregister_vdev(struct video_device *vdev)
 
 	video_devices[vdev->ind] = NULL;
 	vdev->ind = -1;
+	video_ctrl_handler_free(&vdev->ctrl_handler);
 }
 
 struct video_device *video_find_vdev(const struct device *dev)

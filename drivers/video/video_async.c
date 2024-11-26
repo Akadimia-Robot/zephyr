@@ -5,6 +5,7 @@
  */
 
 #include "video_async.h"
+#include "video_ctrls.h"
 #include "video_device.h"
 
 #include <zephyr/device.h>
@@ -43,9 +44,62 @@ static struct video_device *video_async_find_vdev(struct video_notifier *notifie
 	return notifier->vdev;
 }
 
+/* Add all descendants' control handlers of this notifier to the video device */
+static void add_children_ctrl_handlers_to_vdev(struct video_device *vdev, struct video_notifier *nf)
+{
+	if (!vdev || !nf) {
+		return;
+	}
+
+	nf->vdev = vdev;
+
+	video_ctrl_handler_add(&vdev->ctrl_handler, nf->ctrl_handler);
+
+	for (uint8_t i = 0; i < nf->children_num; ++i) {
+		struct video_notifier *nf_child = video_async_find_notifier(nf->children_devs[i]);
+
+		if (!nf_child) {
+			continue;
+		}
+
+		nf_child->vdev = vdev;
+
+		video_ctrl_handler_add(&vdev->ctrl_handler, nf_child->ctrl_handler);
+
+		add_children_ctrl_handlers_to_vdev(vdev, nf_child);
+	}
+}
+
+/* Remove all descendants' control handlers of this notifier from the video device */
+static void remove_children_ctrl_handlers_from_vdev(struct video_device *vdev,
+						    struct video_notifier *nf)
+{
+	if (!vdev || !nf) {
+		return;
+	}
+
+	nf->vdev = NULL;
+
+	video_ctrl_handler_remove(&vdev->ctrl_handler, nf->ctrl_handler);
+
+	for (uint8_t i = 0; i < nf->children_num; ++i) {
+		struct video_notifier *nf_child = video_async_find_notifier(nf->children_devs[i]);
+
+		if (!nf_child) {
+			continue;
+		}
+
+		nf_child->vdev = NULL;
+
+		video_ctrl_handler_remove(&vdev->ctrl_handler, nf_child->ctrl_handler);
+
+		remove_children_ctrl_handlers_from_vdev(vdev, nf_child);
+	}
+}
+
 void video_async_init(struct video_notifier *notifier, const struct device *dev,
-		      struct video_device *vdev, const struct device **children_devs,
-		      uint8_t children_num)
+		      struct video_device *vdev, struct video_ctrl_handler *hdl,
+		      const struct device **children_devs, uint8_t children_num)
 {
 	if (!notifier) {
 		return;
@@ -53,6 +107,7 @@ void video_async_init(struct video_notifier *notifier, const struct device *dev,
 
 	notifier->dev = dev;
 	notifier->vdev = vdev;
+	notifier->ctrl_handler = hdl;
 	notifier->children_devs = (const struct device **)children_devs;
 	notifier->children_num = children_num;
 }
@@ -83,6 +138,8 @@ int video_async_register(struct video_notifier *notifier)
 					vdev = video_async_find_vdev(notifier);
 					if (vdev) {
 						notifier->vdev = vdev;
+						video_ctrl_handler_add(&vdev->ctrl_handler,
+								       notifier->ctrl_handler);
 					}
 
 					found_parent = true;
@@ -95,6 +152,9 @@ int video_async_register(struct video_notifier *notifier)
 		for (i = 0; i < notifier->children_num; ++i) {
 			if (notifier->children_devs[i] == nf->dev) {
 				nf->parent = notifier;
+
+				add_children_ctrl_handlers_to_vdev(vdev, nf);
+
 				break;
 			}
 		}
@@ -114,5 +174,9 @@ void video_async_unregister(struct video_notifier *notifier)
 		return;
 	}
 
-	sys_slist_find_and_remove(&notifiers_list, &notifier->node);
+	if (sys_slist_find_and_remove(&notifiers_list, &notifier->node)) {
+		struct video_device *vdev = video_async_find_vdev(notifier);
+
+		remove_children_ctrl_handlers_from_vdev(vdev, notifier);
+	}
 }

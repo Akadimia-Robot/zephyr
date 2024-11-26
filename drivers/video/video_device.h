@@ -9,9 +9,12 @@
 
 #include <zephyr/device.h>
 
+#include "video_ctrls.h"
+
 struct video_device {
 	int ind;
 	const struct device *dev;
+	struct video_ctrl_handler ctrl_handler;
 };
 
 int video_register_vdev(struct video_device *vdev, const struct device *dev);
