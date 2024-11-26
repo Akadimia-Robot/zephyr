@@ -131,6 +131,11 @@ Stepper
 Regulator
 =========
 
+UART
+====
+
+* Renamed the ``compatible`` from ``nxp,kinetis-lpuart`` to :dtcompatible:`nxp,lpuart`.
+
 Video
 =====
 
