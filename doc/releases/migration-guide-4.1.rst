@@ -110,6 +110,12 @@ Interrupt Controller
 LED Strip
 =========
 
+MMU/MPU
+=======
+
+* Renamed the ``compatible`` from ``nxp,kinetis-mpu`` to :dtcompatible:`nxp,sysmpu` and added
+  its corresponding binding.
+
 Pin Control
 ===========
 
