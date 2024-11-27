@@ -22,12 +22,16 @@ if(CONFIG_CPP
 endif()
 
 
-if(CONFIG_NEWLIB_LIBC AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
   # We are using c;rt;c (expands to '-lc -lgcc -lc') in code below.
-  # This is needed because when linking with newlib on aarch64, then libgcc has a
+  # This is needed because when linking on aarch64, then libgcc has a
   # link dependency to libc (strchr), but libc also has dependencies to libgcc.
   # Lib C depends on libgcc. e.g. libc.a(lib_a-fvwrite.o) references __aeabi_idiv
-  set_property(TARGET linker APPEND PROPERTY link_order_library "math;c;rt;c")
+  if (CONFIG_NEWLIB_LIBC)
+    set_property(TARGET linker APPEND PROPERTY link_order_library "math;c;rt;c")
+  else()
+    set_property(TARGET linker APPEND PROPERTY link_order_library "c;rt;c")
+  endif()
 else()
   set_property(TARGET linker APPEND PROPERTY link_order_library "c;rt")
 endif()

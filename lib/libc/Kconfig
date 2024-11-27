@@ -45,7 +45,7 @@ config NEWLIB_LIBC_SUPPORTED
 config PICOLIBC_SUPPORTED
 	bool
 	depends on !NATIVE_APPLICATION
-	depends on ("$(TOOLCHAIN_HAS_PICOLIBC)" = "y") || (ZEPHYR_PICOLIBC_MODULE && !REQUIRES_FULL_LIBCPP)
+	depends on ("$(TOOLCHAIN_HAS_PICOLIBC)" = "y") || ZEPHYR_PICOLIBC_MODULE
 	default y
 	select FULL_LIBC_SUPPORTED
 	help
@@ -87,6 +87,7 @@ config PICOLIBC
 	select NEED_LIBC_MEM_PARTITION
 	select TC_PROVIDES_POSIX_C_LANG_SUPPORT_R
 	imply COMMON_LIBC_MALLOC
+	select COMMON_LIBC_MALLOC if REQUIRES_FULL_LIBCPP
 	depends on PICOLIBC_SUPPORTED
 	help
 	  Build with picolibc library. The picolibc library is built as

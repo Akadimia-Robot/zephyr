@@ -23,6 +23,8 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
+    - name: keithp
+      url-base: https://github.com/keith-packard
 
   group-filter: [-babblesim, -optional]
 
@@ -273,6 +275,11 @@ manifest:
     - name: liblc3
       revision: 1a5938ebaca4f13fe79ce074f5dee079783aa29f
       path: modules/lib/liblc3
+    - name: libstdcxx
+      remote: keithp
+      repo-path: libstdcxx-module
+      revision: 8b94ca21ebc054259d8229c47e96b40e44a42baa
+      path: modules/lib/libstdcxx
     - name: littlefs
       path: modules/fs/littlefs
       groups:
@@ -323,7 +330,7 @@ manifest:
         - debug
     - name: picolibc
       path: modules/lib/picolibc
-      revision: d492d5fa7c96918e37653f303028346bb0dd51a2
+      revision: ddb2bad970ab4ef4ba074844023b30aacec5edd6
     - name: segger
       revision: 1a607e8718171cfbc1ee6b2a5ec00f619d1cc7fc
       path: modules/debug/segger
