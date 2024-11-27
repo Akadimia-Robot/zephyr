@@ -1570,7 +1570,7 @@ int supplicant_status(const struct device *dev, struct wifi_iface_status *status
 
 		ret = wpa_drv_signal_poll(wpa_s, si);
 		if (!ret) {
-			status->current_phy_rate = si->current_txrate;
+			status->current_phy_rate = si->data.current_tx_rate;
 		} else {
 			wpa_printf(MSG_WARNING, "%s: Failed to get signal info\n", __func__);
 			status->current_phy_rate = 0;
