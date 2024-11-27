@@ -25,4 +25,5 @@ supported:
   - counter
   - regulator
   - adc
+  - usb_device
 vendor: nxp
