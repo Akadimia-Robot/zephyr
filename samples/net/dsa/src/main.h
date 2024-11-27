@@ -41,7 +41,7 @@ struct instance_data {
 
 /* User data for the interface callback */
 struct ud {
-	struct net_if *lan[3];
+	struct net_if *lan[10];
 	struct net_if *master;
 };
 
