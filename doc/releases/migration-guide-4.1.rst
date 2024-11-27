@@ -152,6 +152,12 @@ Bluetooth Classic
 Bluetooth Host
 ==============
 
+Bluetooth Controller
+====================
+
+* The Kconfig option :kconfig:option:`CONFIG_BT_CTRL_ADV_ADI_IN_SCAN_RSP` has been renamed to
+  :kconfig:option:`CONFIG_BT_CTLR_ADV_ADI_IN_SCAN_RSP`
+
 Bluetooth Crypto
 ================
 
