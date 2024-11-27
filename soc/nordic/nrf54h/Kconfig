@@ -67,3 +67,23 @@ config SOC_NRF54H20_CPUFLPR
 	depends on RISCV_CORE_NORDIC_VPR
 
 rsource "gpd/Kconfig"
+
+config SOC_NRF54H20_GLOBAL_HSFLL_RESTRICT_MIN_FREQ
+	bool "Restrict minimum global HSFLL clock frequency"
+	select NRFS
+	select NRFS_GDFS_SERVICE_ENABLED
+	select CLOCK_CONTROL
+	default y if SOC_NRF54H20_CPUAPP
+
+if SOC_NRF54H20_GLOBAL_HSFLL_RESTRICT_MIN_FREQ
+
+config SOC_NRF54H20_GLOBAL_HSFLL_MIN_FREQ_HZ
+	int "Minimum global HSFLL clock frequency in Hertz"
+	range 64000000 320000000
+	default 320000000
+
+config SOC_NRF54H20_GLOBAL_HSFLL_TIMEOUT_MS
+	int "Global HSFLL timeout in milliseconds"
+	default 1000
+
+endif # SOC_NRF54H20_RESTRICT_GLOBAL_HSFLL_FREQ
