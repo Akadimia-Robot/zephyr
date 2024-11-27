@@ -19,5 +19,4 @@ supported:
 testing:
   ignore_tags:
     - net
-    - bluetooth
 vendor: we
