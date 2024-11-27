@@ -15,6 +15,9 @@
 
 #include <fsl_mipi_csi2rx.h>
 
+#include "video_async.h"
+#include "video_ctrls.h"
+
 LOG_MODULE_REGISTER(video_mipi_csi2rx, CONFIG_VIDEO_LOG_LEVEL);
 
 #define MAX_SUPPORTED_PIXEL_RATE MHZ(96)
@@ -23,10 +26,11 @@ LOG_MODULE_REGISTER(video_mipi_csi2rx, CONFIG_VIDEO_LOG_LEVEL);
 
 struct mipi_csi2rx_config {
 	const MIPI_CSI2RX_Type *base;
-	const struct device *sensor_dev;
+	const struct device **sensor_devs;
 };
 
 struct mipi_csi2rx_data {
+	struct video_notifier notifier;
 	csi2rx_config_t csi2rxConfig;
 	const struct device *clock_dev;
 	clock_control_subsys_t clock_root;
@@ -46,6 +50,25 @@ const struct mipi_csi2rx_tHsSettleEscClk_config tHsSettleEscClk_configs[] = {
 	{MHZ(96), 0x09},
 };
 
+static int32_t get_pixel_rate_from_sensor(const struct device *sensor)
+{
+	struct video_notifier *notifier = video_async_find_notifier(sensor);
+
+	if (!notifier) {
+		LOG_ERR("Sensor device is not registered");
+		return -ENODEV;
+	}
+
+	struct video_ctrl *ctrl = video_ctrl_find(notifier->ctrl_handler, VIDEO_CID_PIXEL_RATE);
+
+	if (!ctrl) {
+		LOG_ERR("Sensor device does not support VIDEO_CID_PIXEL_RATE");
+		return -ENOTSUP;
+	}
+
+	return ctrl->val;
+}
+
 static int mipi_csi2rx_update_settings(const struct device *dev, enum video_endpoint_id ep)
 {
 	const struct mipi_csi2rx_config *config = dev->config;
@@ -56,17 +79,13 @@ static int mipi_csi2rx_update_settings(const struct device *dev, enum video_endp
 	int ret, ind = 0;
 	struct video_format fmt;
 
-	ret = video_get_format(config->sensor_dev, ep, &fmt);
+	ret = video_get_format(*config->sensor_devs, ep, &fmt);
 	if (ret) {
 		LOG_ERR("Cannot get sensor_dev pixel format");
 		return ret;
 	}
 
-	ret = video_get_ctrl(config->sensor_dev, VIDEO_CID_PIXEL_RATE, &sensor_pixel_rate);
-	if (ret) {
-		LOG_ERR("Can not get sensor_dev pixel rate");
-		return ret;
-	}
+	sensor_pixel_rate = get_pixel_rate_from_sensor(*config->sensor_devs);
 
 	if (sensor_pixel_rate > MAX_SUPPORTED_PIXEL_RATE) {
 		LOG_ERR("Sensor pixel rate is not supported");
@@ -123,7 +142,7 @@ static int mipi_csi2rx_set_fmt(const struct device *dev, enum video_endpoint_id 
 {
 	const struct mipi_csi2rx_config *config = dev->config;
 
-	if (video_set_format(config->sensor_dev, ep, fmt)) {
+	if (video_set_format(*config->sensor_devs, ep, fmt)) {
 		return -EIO;
 	}
 
@@ -139,7 +158,7 @@ static int mipi_csi2rx_get_fmt(const struct device *dev, enum video_endpoint_id 
 		return -EINVAL;
 	}
 
-	if (video_get_format(config->sensor_dev, ep, fmt)) {
+	if (video_get_format(*config->sensor_devs, ep, fmt)) {
 		return -EIO;
 	}
 
@@ -153,7 +172,7 @@ static int mipi_csi2rx_stream_start(const struct device *dev)
 
 	CSI2RX_Init((MIPI_CSI2RX_Type *)config->base, &drv_data->csi2rxConfig);
 
-	if (video_stream_start(config->sensor_dev)) {
+	if (video_stream_start(*config->sensor_devs)) {
 		return -EIO;
 	}
 
@@ -164,7 +183,7 @@ static int mipi_csi2rx_stream_stop(const struct device *dev)
 {
 	const struct mipi_csi2rx_config *config = dev->config;
 
-	if (video_stream_stop(config->sensor_dev)) {
+	if (video_stream_stop(*config->sensor_devs)) {
 		return -EIO;
 	}
 
@@ -183,15 +202,15 @@ static int mipi_csi2rx_get_caps(const struct device *dev, enum video_endpoint_id
 	}
 
 	/* Just forward to sensor dev for now */
-	return video_get_caps(config->sensor_dev, ep, caps);
+	return video_get_caps(*config->sensor_devs, ep, caps);
 }
 
-static inline int mipi_csi2rx_set_ctrl(const struct device *dev, unsigned int cid, void *value)
+static inline int mipi_csi2rx_set_ctrl(const struct device *dev, struct video_control *control)
 {
 	const struct mipi_csi2rx_config *config = dev->config;
 
-	if (config->sensor_dev) {
-		return video_set_ctrl(config->sensor_dev, cid, value);
+	if (*config->sensor_devs) {
+		return video_set_ctrl(*config->sensor_devs, control);
 	}
 
 	return -ENOTSUP;
@@ -203,7 +222,7 @@ static int mipi_csi2rx_set_frmival(const struct device *dev, enum video_endpoint
 	const struct mipi_csi2rx_config *config = dev->config;
 	int ret;
 
-	ret = video_set_frmival(config->sensor_dev, ep, frmival);
+	ret = video_set_frmival(*config->sensor_devs, ep, frmival);
 	if (ret) {
 		LOG_ERR("Cannot set sensor_dev frmival");
 		return ret;
@@ -219,7 +238,7 @@ static int mipi_csi2rx_get_frmival(const struct device *dev, enum video_endpoint
 {
 	const struct mipi_csi2rx_config *config = dev->config;
 
-	return video_get_frmival(config->sensor_dev, ep, frmival);
+	return video_get_frmival(*config->sensor_devs, ep, frmival);
 }
 
 static uint64_t mipi_csi2rx_cal_frame_size(const struct video_format *fmt)
@@ -249,24 +268,20 @@ static int mipi_csi2rx_enum_frmival(const struct device *dev, enum video_endpoin
 	struct video_frmival cur_frmival;
 	struct video_format cur_fmt;
 
-	ret = video_enum_frmival(config->sensor_dev, ep, fie);
+	ret = video_enum_frmival(*config->sensor_devs, ep, fie);
 	if (ret) {
 		return ret;
 	}
 
-	ret = video_get_ctrl(config->sensor_dev, VIDEO_CID_PIXEL_RATE, &cur_pixel_rate);
-	if (ret) {
-		LOG_ERR("Cannot get sensor_dev pixel rate");
-		return ret;
-	}
+	cur_pixel_rate = get_pixel_rate_from_sensor(*config->sensor_devs);
 
-	ret = video_get_frmival(config->sensor_dev, ep, &cur_frmival);
+	ret = video_get_frmival(*config->sensor_devs, ep, &cur_frmival);
 	if (ret) {
 		LOG_ERR("Cannot get sensor_dev frame rate");
 		return ret;
 	}
 
-	ret = video_get_format(config->sensor_dev, ep, &cur_fmt);
+	ret = video_get_format(*config->sensor_devs, ep, &cur_fmt);
 	if (ret) {
 		LOG_ERR("Cannot get sensor_dev format");
 		return ret;
@@ -318,6 +333,16 @@ static const struct video_driver_api mipi_csi2rx_driver_api = {
 	.enum_frmival = mipi_csi2rx_enum_frmival,
 };
 
+static int mipi_csi2rx_async_register(const struct device *dev)
+{
+	const struct mipi_csi2rx_config *config = dev->config;
+	struct mipi_csi2rx_data *drv_data = dev->data;
+
+	video_async_init(&drv_data->notifier, dev, NULL, NULL, config->sensor_devs, 1);
+
+	return video_async_register(&drv_data->notifier);
+}
+
 static int mipi_csi2rx_init(const struct device *dev)
 {
 	const struct mipi_csi2rx_config *config = dev->config;
@@ -325,7 +350,7 @@ static int mipi_csi2rx_init(const struct device *dev)
 	int ret;
 
 	/* Check if there is any sensor device */
-	if (!device_is_ready(config->sensor_dev)) {
+	if (!device_is_ready(*config->sensor_devs)) {
 		return -ENODEV;
 	}
 
@@ -339,7 +364,12 @@ static int mipi_csi2rx_init(const struct device *dev)
 		return ret;
 	}
 
-	return mipi_csi2rx_update_settings(dev, VIDEO_EP_ALL);
+	ret = mipi_csi2rx_update_settings(dev, VIDEO_EP_ALL);
+	if (ret) {
+		return ret;
+	}
+
+	return mipi_csi2rx_async_register(dev);
 }
 
 #define MIPI_CSI2RX_INIT(n)                                                                        \
@@ -353,7 +383,8 @@ static int mipi_csi2rx_init(const struct device *dev)
                                                                                                    \
 	static const struct mipi_csi2rx_config mipi_csi2rx_config_##n = {                          \
 		.base = (MIPI_CSI2RX_Type *)DT_INST_REG_ADDR(n),                                   \
-		.sensor_dev = DEVICE_DT_GET_REMOTE_DEVICE(DT_INST_ENDPOINT_BY_ID(n, 1, 0)),        \
+		.sensor_devs = (const struct device *[]){DEVICE_DT_GET_REMOTE_DEVICE(              \
+			DT_INST_ENDPOINT_BY_ID(n, 1, 0))},                                         \
 	};                                                                                         \
                                                                                                    \
 	DEVICE_DT_INST_DEFINE(n, &mipi_csi2rx_init, NULL, &mipi_csi2rx_data_##n,                   \

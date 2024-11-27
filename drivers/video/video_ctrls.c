@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/drivers/video.h>
 #include <zephyr/drivers/video-controls.h>
 #include <zephyr/logging/log.h>
 
@@ -222,7 +223,16 @@ int video_set_ctrl(const struct device *dev, struct video_control *control)
 		return -EINVAL;
 	}
 
-	/* Call driver's set_ctrl callback here to actually set the ctrl */
+	const struct video_driver_api *api = (const struct video_driver_api *)dev->api;
+
+	if (api->set_ctrl == NULL) {
+		return -ENOSYS;
+	}
+
+	ret = api->set_ctrl(dev, control);
+	if (ret) {
+		return ret;
+	}
 
 	/* Only update the ctrl in memory once everything is OK */
 	ctrl->val = control->val;
