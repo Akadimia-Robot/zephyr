@@ -1,0 +1,15 @@
+tests:
+  sdp.c:
+    platform_allow:
+      - mimxrt1170_evk@B/mimxrt1176/cm7
+    tags:
+      - bluetooth
+      - sdp
+    integration_platforms:
+      - mimxrt1170_evk@B/mimxrt1176/cm7
+    harness: pytest
+    harness_config:
+      pytest_dut_scope: session
+      fixture: bumble
+      pytest_args: ['--log-level=DEBUG']
+    timeout: 150
