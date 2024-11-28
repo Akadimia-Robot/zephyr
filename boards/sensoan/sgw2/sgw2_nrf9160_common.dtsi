@@ -24,6 +24,7 @@
 		button0: button_0 {
 			gpios = <&edge_connector 11 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
 			label = "Button 1";
+			zephyr,code = <INPUT_KEY_0>;
 		};
 	};
 
