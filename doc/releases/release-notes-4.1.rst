@@ -93,6 +93,8 @@ Boards & SoC Support
 
 * Made these board changes:
 
+  * Enabled RTC, PIT on NXP ``frdm_mcxc444``
+
 * Added support for the following shields:
 
 Build system and Infrastructure
