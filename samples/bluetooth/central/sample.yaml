@@ -9,3 +9,10 @@ tests:
     tags: bluetooth
     integration_platforms:
       - qemu_cortex_m3
+  sample.bluetooth.central.esp32:
+    extra_args:
+      - CONFIG_BT_BUILD_ONLY_MODE=y
+    platform_allow:
+      - esp32_devkitc_wroom/esp32/procpu
+      - esp32s3_devkitm/esp32s3/procpu
+      - esp32c3_devkitm

@@ -20,5 +20,4 @@ supported:
 testing:
   ignore_tags:
     - net
-    - bluetooth
 vendor: vcc-gnd

@@ -12,7 +12,6 @@ supported:
   - watchdog
 testing:
   ignore_tags:
-    - bluetooth
     - gpio
     - net
     - pinmux
