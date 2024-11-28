@@ -24,4 +24,13 @@
 			slew-rate = "slow";
 		};
 	};
+	pinmux_i2c0: pinmux_i2c0 {
+		group0 {
+			pinmux = <I2C0_SCL_PTE24>,
+				<I2C0_SDA_PTE25>;
+			drive-strength = "low";
+			drive-open-drain;
+			slew-rate = "fast";
+		};
+	};
 };
