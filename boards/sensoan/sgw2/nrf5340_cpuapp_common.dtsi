@@ -36,6 +36,14 @@
 	};
 };
 
+&lfxo {
+	load-capacitors = "external";
+};
+
+&hfxo {
+	load-capacitors = "external";
+};
+
 &adc {
 	status = "okay";
 };
