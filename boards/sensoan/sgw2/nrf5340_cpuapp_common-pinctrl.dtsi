@@ -5,14 +5,14 @@
  */
 
 &pinctrl {
-	i2c0_default: sensorbus_default: i2c0_default {
+	i2c2_default: sensorbus_default: i2c2_default {
 		group1 {
 			psels = <SGW_PSEL(TWIM_SDA, EDGE_CONN, 31)>,
 				<SGW_PSEL(TWIM_SCL, EDGE_CONN, 33)>;
 		};
 	};
 
-	i2c0_sleep: sensorbus_sleep:  i2c0_sleep {
+	i2c2_sleep: sensorbus_sleep:  i2c2_sleep {
 		group1 {
 			psels = <SGW_PSEL(TWIM_SDA, EDGE_CONN, 31)>,
 				<SGW_PSEL(TWIM_SCL, EDGE_CONN, 33)>;
