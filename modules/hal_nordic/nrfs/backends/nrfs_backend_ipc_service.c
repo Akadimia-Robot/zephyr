@@ -177,7 +177,10 @@ nrfs_err_t nrfs_backend_send_ex(void *message, size_t size, k_timeout_t timeout,
 		return NRFS_ERR_INVALID_STATE;
 	}
 
-	if (size <= MAX_PACKET_DATA_SIZE) {
+	if (!k_is_in_isr()) {
+		return ipc_service_send(&ipc_cpusys_channel_config.ipc_ept, message, size) ?
+			NRFS_SUCCESS : NRFS_ERR_IPC;
+	} else if (size <= MAX_PACKET_DATA_SIZE) {
 		int err;
 		struct ipc_data_packet tx_data;
 
