@@ -18,6 +18,7 @@ supported:
   - gpio
   - uart
   - counter
+  - pwm
 testing:
   ignore_tags:
     - net
