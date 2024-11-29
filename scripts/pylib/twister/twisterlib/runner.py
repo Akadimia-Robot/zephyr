@@ -1095,7 +1095,7 @@ class ProjectBuilder(FilterBuilder):
         if symbol_name[:2] == '_Z':
             try:
                 cpp_filt = subprocess.run('c++filt', input=symbol_name, text=True, check=True,
-                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                          capture_output=True)
                 if self.trace:
                     logger.debug(f"Demangle: '{symbol_name}'==>'{cpp_filt.stdout}'")
                 return cpp_filt.stdout.strip()
@@ -1796,6 +1796,11 @@ class TwisterRunner:
                             pb = ProjectBuilder(instance, self.env, self.jobserver)
                             pb.duts = self.duts
                             pb.process(pipeline, done_queue, task, lock, results)
+                            if self.env.options.quit_on_failure:
+                                if pb.instance.status in [TwisterStatus.FAIL, TwisterStatus.ERROR]:
+                                    with pipeline.mutex:
+                                        pipeline.queue.clear()
+                                    break
 
                     return True
             else:
@@ -1809,6 +1814,11 @@ class TwisterRunner:
                         pb = ProjectBuilder(instance, self.env, self.jobserver)
                         pb.duts = self.duts
                         pb.process(pipeline, done_queue, task, lock, results)
+                        if self.env.options.quit_on_failure:
+                            if pb.instance.status in [TwisterStatus.FAIL, TwisterStatus.ERROR]:
+                                with pipeline.mutex:
+                                    pipeline.queue.clear()
+                                break
                 return True
         except Exception as e:
             logger.error(f"General exception: {e}")
