@@ -376,9 +376,9 @@ class TestCase(DisablePyTestCollectionMixin):
     def status(self, value : TwisterStatus) -> None:
         # Check for illegal assignments by value
         try:
-            key = value.name if isinstance(value, Enum) else value
-            self._status = TwisterStatus[key]
-        except KeyError:
+            key = value.value if isinstance(value, Enum) else value
+            self._status = TwisterStatus(key)
+        except ValueError:
             raise StatusAttributeError(self.__class__, value)
 
     def __lt__(self, other):
@@ -442,9 +442,9 @@ class TestSuite(DisablePyTestCollectionMixin):
     def status(self, value : TwisterStatus) -> None:
         # Check for illegal assignments by value
         try:
-            key = value.name if isinstance(value, Enum) else value
-            self._status = TwisterStatus[key]
-        except KeyError:
+            key = value.value if isinstance(value, Enum) else value
+            self._status = TwisterStatus(key)
+        except ValueError:
             raise StatusAttributeError(self.__class__, value)
 
     def load(self, data):
