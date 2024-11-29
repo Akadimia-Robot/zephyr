@@ -1499,6 +1499,7 @@ static int cmd_wifi_twt_setup_quick(const struct shell *sh, size_t argc,
 	params.setup.implicit = 1;
 	params.setup.trigger = 0;
 	params.setup.announce = 0;
+	params.setup.exponent = 10;
 
 	if (!parse_number(sh, &value, argv[idx++], NULL, 1, WIFI_MAX_TWT_WAKE_INTERVAL_US)) {
 		return -EINVAL;
@@ -1595,6 +1596,16 @@ static int cmd_wifi_twt_setup(const struct shell *sh, size_t argc,
 	}
 	params.setup.twt_wake_ahead_duration = (uint32_t)value;
 
+	if (!parse_number(sh, &value, argv[idx++], NULL, 0, 1)) {
+		return -EINVAL;
+	}
+	params.setup.twt_info_disable = (bool)value;
+
+	if (!parse_number(sh, &value, argv[idx++], NULL, 0, WIFI_MAX_TWT_EXPONENT)) {
+		return -EINVAL;
+	}
+	params.setup.exponent = (uint8_t)value;
+
 	if (net_mgmt(NET_REQUEST_WIFI_TWT, iface, &params, sizeof(params))) {
 		PR_WARNING("%s with %s failed. reason : %s\n",
 			   wifi_twt_operation_txt(params.operation),
@@ -1644,6 +1655,11 @@ static int cmd_wifi_twt_teardown(const struct shell *sh, size_t argc,
 		return -EINVAL;
 	}
 	params.flow_id = (uint8_t)value;
+
+	if (!parse_number(sh, &value, argv[idx++], NULL, 0, 1)) {
+		return -EINVAL;
+	}
+	params.teardown.teardown_all = (bool)value;
 
 	if (net_mgmt(NET_REQUEST_WIFI_TWT, iface, &params, sizeof(params))) {
 		PR_WARNING("%s with %s failed, reason : %s\n",
@@ -3184,15 +3200,16 @@ SHELL_STATIC_SUBCMD_SET_CREATE(wifi_twt_ops,
 		"<setup_cmd: 0: Request, 1: Suggest, 2: Demand>\n"
 		"<dialog_token: 1-255> <flow_id: 0-7> <responder: 0/1> <trigger: 0/1> <implicit:0/1> "
 		"<announce: 0/1> <twt_wake_interval: 1-262144us> <twt_interval: 1us-2^31us>.\n"
-		"<twt_wake_ahead_duration>: 0us-2^31us>\n",
+		"<twt_wake_ahead_duration>: 0us-2^31us>\n"
+		"<twt_info_disabled: 0/1> <twt_exponent: 0-63>\n",
 		cmd_wifi_twt_setup,
-		12, 0),
+		14, 0),
 	SHELL_CMD_ARG(teardown, NULL, " Teardown a TWT flow:\n"
 		"<negotiation_type, 0: Individual, 1: Broadcast, 2: Wake TBTT>\n"
 		"<setup_cmd: 0: Request, 1: Suggest, 2: Demand>\n"
-		"<dialog_token: 1-255> <flow_id: 0-7>.\n",
+		"<dialog_token: 1-255> <flow_id: 0-7>  <teardown_all_twt: 0/1>.\n",
 		cmd_wifi_twt_teardown,
-		5, 0),
+		6, 0),
 	SHELL_CMD_ARG(teardown_all, NULL, " Teardown all TWT flows.\n",
 		cmd_wifi_twt_teardown_all,
 		1, 0),
