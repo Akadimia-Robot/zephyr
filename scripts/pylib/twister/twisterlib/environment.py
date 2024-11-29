@@ -840,6 +840,18 @@ def parse_arguments(parser: argparse.ArgumentParser, args, options = None, on_in
         logger.error("west-flash requires device-testing to be enabled")
         sys.exit(1)
 
+    if options.device_serial_pty and options.device_serial_pty == "rtt":
+        if options.west_flash is None:
+            logger.error("--device-serial-pty rtt requires --west-flash")
+            sys.exit(1)
+
+        # add the following options
+        options.extra_args += ['CONFIG_USE_SEGGER_RTT=y',
+                               'CONFIG_RTT_CONSOLE=y', 'CONFIG_CONSOLE=y',
+                               # This option is needed to ensure the uart console is not selected
+                               # when CONFIG_RTT_CONSOLE is enabled due to #81798
+                               'CONFIG_UART_CONSOLE=n']
+
     if not options.testsuite_root:
         # if we specify a test scenario which is part of a suite directly, do
         # not set testsuite root to default, just point to the test directory
@@ -896,10 +908,6 @@ def parse_arguments(parser: argparse.ArgumentParser, args, options = None, on_in
 
     if options.flash_before and options.device_flash_with_test:
         logger.error("--device-flash-with-test does not apply when --flash-before is used")
-        sys.exit(1)
-
-    if options.flash_before and options.device_serial_pty:
-        logger.error("--device-serial-pty cannot be used when --flash-before is set (for now)")
         sys.exit(1)
 
     if options.shuffle_tests and options.subset is None:
