@@ -3652,31 +3652,30 @@ uint8_t bt_ull_cp_frame_space(uint16_t handle, uint16_t frame_space_min, uint16_
 
 static int cmd_conn_tifs_update(const struct shell *sh, size_t argc, char *argv[])
 {
-        uint16_t tifs_min;
-        uint16_t tifs_max;
-        uint8_t phys;
-        uint16_t direction;
-        int err;
+	uint16_t tifs_min;
+	uint16_t tifs_max;
+	uint8_t phys;
+	uint16_t direction;
+	int err;
 	uint16_t handle;
 
-
 	handle = default_conn->handle;
-        tifs_min = strtoul(argv[1], NULL, 10);
-        tifs_max = strtoul(argv[2], NULL, 10);
-        phys = strtoul(argv[3], NULL, 10);
+	tifs_min = strtoul(argv[1], NULL, 10);
+	tifs_max = strtoul(argv[2], NULL, 10);
+	phys = strtoul(argv[3], NULL, 10);
 	direction = strtoul(argv[4], NULL, 10);
 	if (default_conn == NULL) {
 		shell_error(sh, "%s: at least, one connection is required",
 			    sh->ctx->active_cmd.syntax);
 		return -ENOEXEC;
 	}
-      err = bt_ull_cp_frame_space(handle, tifs_min, tifs_max, phys, direction);
-        if (err) {
-                shell_error(sh, "frame space update failed (err %d).", err);
-        } else {
-                shell_print(sh, "frame space update initiated.");
-        }
-        return err;
+	err = bt_ull_cp_frame_space(handle, tifs_min, tifs_max, phys, direction);
+	if (err) {
+		shell_error(sh, "frame space update failed (err %d).", err);
+	} else {
+		shell_print(sh, "frame space update initiated.");
+	}
+	return err;
 }
 
 #if defined(CONFIG_BT_USER_PHY_UPDATE)

@@ -896,10 +896,7 @@ static void lp_comm_rx_decode(struct ll_conn *conn, struct proc_ctx *ctx, struct
 		break;
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
 	case PDU_DATA_LLCTRL_TYPE_REJECT_EXT_IND:
-		printk("Frame space reject ind\n");
 		llcp_pdu_decode_reject_ext_ind(ctx, pdu);
-		// pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP;
-		// ctx->response_opcode = PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP;
 		break;
 	case PDU_DATA_LLCTRL_TYPE_REJECT_IND:
 		/* Empty on purpose, as we don't care about the PDU content, we'll disconnect */
@@ -1142,14 +1139,16 @@ static void rp_comm_tx(struct ll_conn *conn, struct proc_ctx *ctx)
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 	case PROC_FRAME_SPACE:
-	if ((conn->lll.frame_space.local.phys & 0x04)) {
-		llcp_pdu_encode_reject_ext_ind(pdu, PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ, BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL);
-	} else if (!IS_ENABLED(CONFIG_BT_ISO) && ((conn->lll.frame_space.local.spacing_type & (T_IFS_CIS | T_MSS_CIS)))) {
-		llcp_pdu_encode_reject_ext_ind(pdu, PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ, BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL);
-	} else
-	{
-		llcp_pdu_encode_frame_space_rsp(conn, pdu);
-	}
+		if ((conn->lll.frame_space.local.phys & 0x04)) {
+			llcp_pdu_encode_reject_ext_ind(pdu, PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ,
+						       BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL);
+		} else if (!IS_ENABLED(CONFIG_BT_ISO) &&
+			   ((conn->lll.frame_space.local.spacing_type & (T_IFS_CIS | T_MSS_CIS)))) {
+			llcp_pdu_encode_reject_ext_ind(pdu, PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ,
+						       BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL);
+		} else {
+			llcp_pdu_encode_frame_space_rsp(conn, pdu);
+		}
 		ctx->node_ref.tx_ack = tx;
 		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_UNUSED;
 

@@ -2746,7 +2746,7 @@ uint8_t ull_frame_space_update_eff(struct ll_conn *conn)
 	phy_tx = PHY_1M;
 	phy_rx = PHY_1M;
 #endif /* CONFIG_BT_PHY_UPDATE */
-	printk("Update frame space eff\n");
+
 	frame_space_changed = ull_frame_space_update_eff_from_local(conn);
 
 	if (frame_space_changed) {
@@ -2812,7 +2812,7 @@ uint8_t ull_frame_space_update_eff_from_local(struct ll_conn *conn)
 {
 	uint8_t frame_space_changed = 0U;
 	uint16_t frame_space_min, frame_space_max;
-	printk("From local\n");
+
 	frame_space_min = MAX(conn->lll.frame_space.local.frame_space_min, EVENT_IFS_LOW_LAT_US);
 	frame_space_max = MAX(conn->lll.frame_space.local.frame_space_max, EVENT_IFS_LOW_LAT_US);
 
@@ -2827,8 +2827,6 @@ uint8_t ull_frame_space_update_eff_from_local(struct ll_conn *conn)
 void ull_frame_space_local_tx_update(struct ll_conn *conn, uint16_t frame_space_min,
 				     uint16_t frame_space_max, uint8_t phys, uint16_t spacing_type)
 {
-
-	printk("From txs\n");
 	conn->lll.frame_space.local.frame_space_min = frame_space_min;
 	if (conn->lll.tifs_rx_us > frame_space_max) {
 		frame_space_max = conn->lll.tifs_rx_us;
@@ -2847,15 +2845,15 @@ uint8_t ull_frame_space_init(struct ll_conn *conn)
 	conn->lll.tifs_tx_us = EVENT_IFS_US;
 	conn->lll.tifs_cis_us = EVENT_IFS_US;
 	conn->lll.frame_space.local.frame_space_min = EVENT_IFS_LOW_LAT_US;
-	conn->lll.frame_space.local.frame_space_max =
-		EVENT_IFS_MAX_US; /* AKr TODO: is this large enough?*/
+	conn->lll.frame_space.local.frame_space_max = EVENT_IFS_MAX_US;
 	conn->lll.frame_space.eff.frame_space_min = EVENT_IFS_US;
 	conn->lll.frame_space.eff.frame_space_max = EVENT_IFS_US;
 	for (size_t i = 0; i < 3; i++) {
 		conn->lll.frame_space.perphy[i].frame_space_min = EVENT_IFS_US;
 		conn->lll.frame_space.perphy[i].frame_space_max = EVENT_IFS_US;
 		conn->lll.frame_space.perphy[i].phys = PHY_1M | PHY_2M | PHY_CODED;
-		conn->lll.frame_space.perphy[i].spacing_type = T_IFS_ACL_PC | T_IFS_ACL_CP | T_IFS_CIS;
+		conn->lll.frame_space.perphy[i].spacing_type =
+			T_IFS_ACL_PC | T_IFS_ACL_CP | T_IFS_CIS;
 	}
 
 	return 0;
