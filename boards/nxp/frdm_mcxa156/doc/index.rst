@@ -54,6 +54,8 @@ The FRDM-MCXA156 board configuration supports the following hardware features:
 +-----------+------------+-------------------------------------+
 | FLASH     | on-chip    | soc flash                           |
 +-----------+------------+-------------------------------------+
+| PWM       | on-chip    | pwm                                 |
++-----------+------------+-------------------------------------+
 
 Targets available
 ==================
