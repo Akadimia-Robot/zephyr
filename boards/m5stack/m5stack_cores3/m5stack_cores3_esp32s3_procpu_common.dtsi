@@ -4,16 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/dts-v1/;
-
 #include <espressif/esp32s3/esp32s3_wroom_n16r8.dtsi>
 #include <espressif/partitions_0x0_amp.dtsi>
 #include "m5stack_cores3-pinctrl.dtsi"
+#include "m5stack_mbus_connectors.dtsi"
+#include "grove_connectors.dtsi"
 
 / {
-	model = "M5Stack CoreS3 PROCPU";
-	compatible = "m5stack,cores3";
-
 	chosen {
 		zephyr,sram = &sram0;
 		zephyr,console = &usb_serial;
@@ -24,10 +21,12 @@
 	};
 
 	aliases {
+		uart-0 = &uart0;
+		uart-1 = &uart1;
+		uart-2 = &uart2;
 		i2c-0 = &i2c0;
+		i2c-1 = &i2c1;
 		watchdog0 = &wdt0;
-		accel0 = &bmi270;
-		magn0 = &bmm150;
 	};
 };
 
@@ -42,25 +41,44 @@
 	pinctrl-names = "default";
 };
 
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart1_default>;
+	pinctrl-names = "default";
+};
+
+&uart2 {
+	status = "disabled";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart2_default>;
+	pinctrl-names = "default";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
 &i2c0 {
 	status = "okay";
 	clock-frequency = <I2C_BITRATE_STANDARD>;
 	pinctrl-0 = <&i2c0_default>;
 	pinctrl-names = "default";
+};
 
-	bmi270: bmi270@69 {
-		compatible = "bosch,bmi270";
-		reg = <0x69>;
-	};
-
-	bmm150: bmm150@10 {
-		compatible = "bosch,bmm150";
-		status = "okay";
-		reg = <0x10>;
-	};
+&i2c1 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	pinctrl-0 = <&i2c1_default>;
+	pinctrl-names = "default";
 };
 
 &spi2 {
+	status = "okay";
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";
@@ -68,12 +86,17 @@
 	pinctrl-names = "default";
 };
 
+&twai {
+	status = "disabled";
+	pinctrl-0 = <&twai_default>;
+	pinctrl-names = "default";
+};
+
 &wdt0 {
 	status = "okay";
 };
 
-&psram0 {
-	reg = <0x3c000000 DT_SIZE_M(8)>;
+&trng0 {
 	status = "okay";
 };
 
