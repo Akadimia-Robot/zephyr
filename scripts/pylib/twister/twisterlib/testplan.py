@@ -71,6 +71,8 @@ class Filters:
     TOOLCHAIN = 'Toolchain filter'
     # in case an optional module is not available
     MODULE = 'Module filter'
+    # in case an optional module is not available
+    ENVIRONMENT = 'Environment filter'
 
 
 class TestLevel:
@@ -1011,7 +1013,7 @@ class TestPlan:
                 if not plat.env_satisfied:
                     instance.add_filter(
                         "Environment ({}) not satisfied".format(", ".join(plat.env)),
-                        Filters.PLATFORM
+                        Filters.ENVIRONMENT
                     )
 
                 if not force_toolchain \
@@ -1305,7 +1307,7 @@ def change_skip_to_error_if_integration(options, instance):
         filters = {t['type'] for t in instance.filters}
         ignore_filters ={Filters.CMD_LINE, Filters.SKIP, Filters.PLATFORM_KEY,
                          Filters.TOOLCHAIN, Filters.MODULE, Filters.TESTPLAN,
-                         Filters.QUARANTINE}
+                         Filters.QUARANTINE, Filters.ENVIRONMENT}
         if filters.intersection(ignore_filters):
             return
         instance.status = TwisterStatus.ERROR
