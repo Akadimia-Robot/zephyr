@@ -179,6 +179,8 @@ config BT_HOST_CRYPTO
 config BT_HOST_CRYPTO_PRNG
 	bool "Use PSA crypto API library for random number generation"
 	default y
+	# An implementation of z_impl_sys_rand_get() is required
+	select ENTROPY_GENERATOR if !TEST_RANDOM_GENERATOR
 	select PSA_WANT_ALG_SHA_256
 	select PSA_WANT_KEY_TYPE_HMAC
 	select PSA_WANT_ALG_HMAC
