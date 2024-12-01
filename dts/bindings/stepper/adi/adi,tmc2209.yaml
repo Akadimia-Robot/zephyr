@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 Fabian Blatz <fabianblatz@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Device tree binding for the Analog Devices TMC2209 stepper motor driver.
+
+compatible: "adi,tmc2209"
+
+include:
+  - name: zephyr,step-direction-stepper-common.yaml
+  - name: stepper-controller.yaml
+    property-allowlist:
+      - micro-step-res
+
+properties:
+  enable-gpios:
+    type: phandle-array
+    description: |
+      GPIO pins used to control the enable signal of the motor driver.
+
+  msx-gpios:
+    type: phandle-array
+    description: |
+      An array of GPIO pins for configuring the microstep resolution of the driver.
+      The pins should be listed in the following order:
+      - MS1
+      - MS2
