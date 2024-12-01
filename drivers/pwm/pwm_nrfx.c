@@ -11,6 +11,14 @@
 #include <hal/nrf_gpio.h>
 #include <stdbool.h>
 #include <zephyr/linker/devicetree_regions.h>
+#include <zephyr/cache.h>
+#include <zephyr/mem_mgmt/mem_attr.h>
+#ifdef CONFIG_SOC_NRF54H20_GPD
+#include <nrf/gpd.h>
+#endif
+#ifdef CONFIG_CLOCK_CONTROL
+#include <zephyr/drivers/clock_control/nrf_clock_control.h>
+#endif
 
 #include <zephyr/logging/log.h>
 
@@ -30,6 +38,20 @@ LOG_MODULE_REGISTER(pwm_nrfx, CONFIG_PWM_LOG_LEVEL);
 #define ANOMALY_109_EGU_IRQ_CONNECT(idx)
 #endif
 
+#define PWM(dev_idx) DT_NODELABEL(pwm##dev_idx)
+#define PWM_PROP(dev_idx, prop) DT_PROP(PWM(dev_idx), prop)
+#define PWM_HAS_PROP(idx, prop) DT_NODE_HAS_PROP(PWM(idx), prop)
+
+#define PWM_NRFX_IS_FAST(unused, prefix, idx, _)						  \
+	COND_CODE_1(DT_NODE_HAS_STATUS_OKAY(PWM(idx)),						  \
+		(COND_CODE_1(UTIL_AND(CONFIG_SOC_NRF54H20_GPD, PWM_HAS_PROP(idx, power_domains)), \
+			     (COND_CODE_1(DT_PHA(PWM(idx), power_domains, id), (0), (1))),	  \
+			     (0))), (0))
+
+#if NRFX_FOREACH_PRESENT(PWM, PWM_NRFX_IS_FAST, (||), (0))
+#define PWM_NRFX_FAST_PRESENT 1
+#endif
+
 #define PWM_NRFX_CH_POLARITY_MASK BIT(15)
 #define PWM_NRFX_CH_COMPARE_MASK  BIT_MASK(15)
 #define PWM_NRFX_CH_VALUE(compare_value, inverted) \
@@ -40,6 +62,14 @@ struct pwm_nrfx_config {
 	nrfx_pwm_config_t initial_config;
 	nrf_pwm_sequence_t seq;
 	const struct pinctrl_dev_config *pcfg;
+	uint32_t clock_freq;
+#ifdef CONFIG_DCACHE
+	uint32_t mem_attr;
+#endif
+#ifdef PWM_NRFX_FAST_PRESENT
+	const struct device *clk_dev;
+	struct nrf_clock_spec clk_spec;
+#endif
 };
 
 struct pwm_nrfx_data {
@@ -48,6 +78,11 @@ struct pwm_nrfx_data {
 	uint8_t  pwm_needed;
 	uint8_t  prescaler;
 	bool     stop_requested;
+#ifdef PWM_NRFX_FAST_PRESENT
+	struct onoff_client clk_cli;
+	struct k_sem *sem;
+	int res;
+#endif
 };
 /* Ensure the pwm_needed bit mask can accommodate all available channels. */
 #if (NRF_PWM_CHANNEL_COUNT > 8)
@@ -125,6 +160,70 @@ static bool channel_psel_get(uint32_t channel, uint32_t *psel,
 		== PWM_PSEL_OUT_CONNECT_Connected);
 }
 
+#ifdef PWM_NRFX_FAST_PRESENT
+static void pwm_nrfx_hsfll_cb(struct onoff_manager *mgr, struct onoff_client *cli,
+			      uint32_t state, int res)
+{
+	ARG_UNUSED(state);
+
+	struct pwm_nrfx_data *data = CONTAINER_OF(cli, struct pwm_nrfx_data, clk_cli);
+
+	data->res = res;
+	k_sem_give(data->sem);
+}
+
+static int pwm_nrfx_hsfll_request(const struct device *dev)
+{
+	const struct pwm_nrfx_config *config = dev->config;
+	struct pwm_nrfx_data *data = dev->data;
+
+	struct k_sem sem;
+
+	data->sem = &sem;
+	k_sem_init(data->sem, 0, 1);
+
+	sys_notify_init_callback(&data->clk_cli.notify, pwm_nrfx_hsfll_cb);
+
+	int err;
+
+	err = nrf_clock_control_request(config->clk_dev, &config->clk_spec, &data->clk_cli);
+	if(err < 0) {
+		LOG_ERR("Clock request failed: %d", err);
+		return err;
+	}
+
+	err = k_sem_take(data->sem, K_SECONDS(2)); /* Based on clock_control sample */
+	if(err < 0) {
+		LOG_ERR("Callback failed: %d", err);
+		return err;
+	}
+
+	if(data->res < 0)
+	{
+		LOG_ERR("Clock request reponse failed: %d", data->res);
+		return data->res;
+	}
+
+	return 0;
+}
+
+static int pwm_nrfx_hsfll_release(const struct device *dev)
+{
+	const struct pwm_nrfx_config *config = dev->config;
+
+	int err;
+
+	err = nrf_clock_control_release(config->clk_dev, &config->clk_spec);
+
+	if(err < 0) {
+		LOG_ERR("Clock release failed: %d", err);
+		return err;
+	}
+
+	return 0;
+}
+#endif
+
 static int pwm_nrfx_set_cycles(const struct device *dev, uint32_t channel,
 			       uint32_t period_cycles, uint32_t pulse_cycles,
 			       pwm_flags_t flags)
@@ -176,6 +275,12 @@ static int pwm_nrfx_set_cycles(const struct device *dev, uint32_t channel,
 
 	seq_values_ptr_get(dev)[channel] = PWM_NRFX_CH_VALUE(compare_value, inverted);
 
+#ifdef CONFIG_DCACHE
+	if (config->mem_attr & DT_MEM_CACHEABLE) {
+		sys_cache_data_flush_range(seq_values_ptr_get(dev), config->seq.length);
+	}
+#endif
+
 	LOG_DBG("channel %u, pulse %u, period %u, prescaler: %u.",
 		channel, pulse_cycles, period_cycles, data->prescaler);
 
@@ -214,6 +319,9 @@ static int pwm_nrfx_set_cycles(const struct device *dev, uint32_t channel,
 		 * ensure it is stopped before starting the next playback.
 		 */
 		nrfx_pwm_stop(&config->pwm, false);
+#if PWM_NRFX_FAST_PRESENT
+		pwm_nrfx_hsfll_release(dev);
+#endif
 		data->stop_requested = true;
 	} else {
 		if (data->stop_requested) {
@@ -233,6 +341,9 @@ static int pwm_nrfx_set_cycles(const struct device *dev, uint32_t channel,
 		 * until another playback is requested (new values will be
 		 * loaded then) or the PWM peripheral is stopped.
 		 */
+#if PWM_NRFX_FAST_PRESENT
+		pwm_nrfx_hsfll_request(dev);
+#endif
 		nrfx_pwm_simple_playback(&config->pwm, &config->seq, 1,
 					 NRFX_PWM_FLAG_NO_EVT_FINISHED);
 	}
@@ -243,11 +354,9 @@ static int pwm_nrfx_set_cycles(const struct device *dev, uint32_t channel,
 static int pwm_nrfx_get_cycles_per_sec(const struct device *dev, uint32_t channel,
 				       uint64_t *cycles)
 {
-	/* TODO: Since this function might be removed, we will always return
-	 * 16MHz from this function and handle the conversion with prescaler,
-	 * etc, in the pin set function. See issue #6958.
-	 */
-	*cycles = 16ul * 1000ul * 1000ul;
+	const struct pwm_nrfx_config *config = dev->config;
+
+	*cycles = config->clock_freq;
 
 	return 0;
 }
@@ -263,6 +372,10 @@ static void pwm_resume(const struct device *dev)
 	uint8_t initially_inverted = 0;
 
 	(void)pinctrl_apply_state(config->pcfg, PINCTRL_STATE_DEFAULT);
+
+#ifdef CONFIG_SOC_NRF54H20_GPD
+	nrf_gpd_retain_pins_set(config->pcfg, false);
+#endif
 
 	for (size_t i = 0; i < NRF_PWM_CHANNEL_COUNT; i++) {
 		uint32_t psel;
@@ -289,8 +402,15 @@ static void pwm_suspend(const struct device *dev)
 	const struct pwm_nrfx_config *config = dev->config;
 
 	nrfx_pwm_stop(&config->pwm, false);
+#if PWM_NRFX_FAST_PRESENT
+		pwm_nrfx_hsfll_release(dev);
+#endif
 	while (!nrfx_pwm_stopped_check(&config->pwm)) {
 	}
+
+#ifdef CONFIG_SOC_NRF54H20_GPD
+	nrf_gpd_retain_pins_set(config->pcfg, true);
+#endif
 
 	memset(dev->data, 0, sizeof(struct pwm_nrfx_data));
 	(void)pinctrl_apply_state(config->pcfg, PINCTRL_STATE_SLEEP);
@@ -330,15 +450,31 @@ static int pwm_nrfx_init(const struct device *dev)
 	return pm_device_driver_init(dev, pwm_nrfx_pm_action);
 }
 
-#define PWM(dev_idx) DT_NODELABEL(pwm##dev_idx)
-#define PWM_PROP(dev_idx, prop) DT_PROP(PWM(dev_idx), prop)
-#define PWM_HAS_PROP(idx, prop) DT_NODE_HAS_PROP(PWM(idx), prop)
+#define PWM_MEM_REGION(idx)     DT_PHANDLE(PWM(idx), memory_regions)
 
 #define PWM_MEMORY_SECTION(idx)						      \
 	COND_CODE_1(PWM_HAS_PROP(idx, memory_regions),			      \
 		(__attribute__((__section__(LINKER_DT_NODE_REGION_NAME(	      \
-			DT_PHANDLE(PWM(idx), memory_regions)))))),	      \
+			PWM_MEM_REGION(idx)))))),			      \
 		())
+
+#define PWM_GET_MEM_ATTR(idx)						      \
+	COND_CODE_1(PWM_HAS_PROP(idx, memory_regions),			      \
+		(DT_PROP_OR(PWM_MEM_REGION(idx), zephyr_memory_attr, 0)), (0))
+
+#define DT_PROP_LAST(node, prop) \
+	DT_PROP_BY_IDX(node, prop, UTIL_CAT(Z_UTIL_DEC_, DT_PROP_LEN(node, prop)))
+
+#define PWM_CLOCK_FREQUENCY(idx)							   \
+	COND_CODE_1(UTIL_AND(DT_CLOCKS_HAS_IDX(PWM(idx), 0),				   \
+			     DT_NODE_HAS_PROP(DT_CLOCKS_CTLR(PWM(idx)), clock_frequency)), \
+			     (DT_PROP(DT_CLOCKS_CTLR(PWM(idx)), clock_frequency)),	   \
+			     (16ul * 1000ul * 1000ul))
+
+#define PWM_MAX_CLOCK_FREQUENCY(idx)							     \
+	COND_CODE_1(DT_NODE_HAS_PROP(DT_CLOCKS_CTLR(PWM(idx)), supported_clock_frequencies), \
+		    (DT_PROP_LAST(DT_CLOCKS_CTLR(PWM(idx)), supported_clock_frequencies)),   \
+		    (PWM_CLOCK_FREQUENCY(idx)))
 
 #define PWM_NRFX_DEVICE(idx)						      \
 	NRF_DT_CHECK_NODE_HAS_PINCTRL_SLEEP(PWM(idx));			      \
@@ -362,6 +498,16 @@ static int pwm_nrfx_init(const struct device *dev)
 		.seq.values.p_raw = pwm_##idx##_seq_values,		      \
 		.seq.length = NRF_PWM_CHANNEL_COUNT,			      \
 		.pcfg = PINCTRL_DT_DEV_CONFIG_GET(PWM(idx)),		      \
+		.clock_freq = PWM_CLOCK_FREQUENCY(idx),			      \
+		IF_ENABLED(CONFIG_DCACHE,				      \
+			(.mem_attr = PWM_GET_MEM_ATTR(idx),))		      \
+		IF_ENABLED(PWM_NRFX_IS_FAST(_, _, idx, _),		      \
+			(.clk_dev = DEVICE_DT_GET(DT_CLOCKS_CTLR(PWM(idx))),  \
+			 .clk_spec = {					      \
+				.frequency = PWM_MAX_CLOCK_FREQUENCY(idx),    \
+				.accuracy = 0,				      \
+				.precision = NRF_CLOCK_CONTROL_PRECISION_DEFAULT, \
+			 },))						      \
 	};								      \
 	static int pwm_nrfx_init##idx(const struct device *dev)		      \
 	{								      \
