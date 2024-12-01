@@ -12,7 +12,7 @@ config SECURE_STORAGE_ITS_STORE_IMPLEMENTATION_SETTINGS
 		&& $(dt_node_has_compat,$(dt_node_parent,$(DT_STORAGE_PARTITION)),fixed-partitions)
 	imply FLASH_MAP
 	imply NVS
-	select SETTINGS
+	depends on SETTINGS
 
 config SECURE_STORAGE_ITS_STORE_IMPLEMENTATION_NONE
 	bool "No ITS store module implementation"
