@@ -36,6 +36,20 @@
 	aliases {
 		led0 = &green_led_1;
 	};
+
+	touch_buttons {
+		compatible = "tsc-keys";
+		status = "okay";
+		tsc-controller = <&tsc>;
+		sampling-interval-ms = <10>;
+		demo_button {
+			label = "Demo Button";
+			group = <&tsc_group6>;
+			noise-threshold = <50>;
+			zephyr,code = <INPUT_KEY_0>;
+		};
+
+	};
 };
 
 &usart1 {
@@ -119,14 +133,14 @@
 	pinctrl-0 = <&tsc_shield_pb12 &tsc_shield_cs_pb13 &tsc_g6_io1_pd10 &tsc_g6_io2_pd11>;
 	pinctrl-names = "default";
 
-	g1 {
+	tsc_group1: g1 {
 		group = <1>;
 		use-as-shield;
 		channel-ios = <TSC_IO2>;
 		sampling-io = <TSC_IO1>;
 	};
 
-	g6 {
+	tsc_group6: g6 {
 		group = <6>;
 		channel-ios = <TSC_IO2>;
 		sampling-io = <TSC_IO1>;

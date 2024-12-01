@@ -1,0 +1,17 @@
+# Copyright (c) 2024 Arif Balik <arifbalik@outlook.com>
+# SPDX-License-Identifier: Apache-2.0
+
+config INPUT_TSC_KEYS
+	bool "STM32 TSC touch library"
+	default y
+	depends on STM32_TSC
+	select RING_BUFFER
+	help
+	  Enable support for STM32 TSC touch library.
+
+config INPUT_TSC_KEYS_BUFFER_WORD_SIZE
+	int "STM32 TSC touch buffer size in words"
+	default 10
+	depends on INPUT_TSC_KEYS
+	help
+	  Set the size of the buffer for the STM32 TSC touch library.
