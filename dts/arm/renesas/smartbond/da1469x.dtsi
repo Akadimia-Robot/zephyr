@@ -355,6 +355,9 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0x50020300 0x100>;
+			dmas = <&dma 2 DMA_SMARTBOND_TRIG_MUX_SPI>,
+				<&dma 3 DMA_SMARTBOND_TRIG_MUX_SPI>;
+			dma-names = "rx", "tx";
 			periph-clock-config = <0x20>;
 			interrupts = <10 0>;
 			status = "disabled";
@@ -365,6 +368,9 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0x50020400 0x100>;
+			dmas = <&dma 4 DMA_SMARTBOND_TRIG_MUX_SPI>,
+				<&dma 5 DMA_SMARTBOND_TRIG_MUX_SPI>;
+			dma-names = "rx", "tx";
 			periph-clock-config = <0x80>;
 			interrupts = <11 0>;
 			status = "disabled";
