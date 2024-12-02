@@ -22,4 +22,6 @@ supported:
   - adc
   - can
   - pwm
+  - dma
+  - spi
 vendor: nxp

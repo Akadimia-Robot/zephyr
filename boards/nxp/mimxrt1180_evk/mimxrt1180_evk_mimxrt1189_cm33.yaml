@@ -23,4 +23,6 @@ supported:
   - netif:eth
   - can
   - pwm
+  - dma
+  - spi
 vendor: nxp
