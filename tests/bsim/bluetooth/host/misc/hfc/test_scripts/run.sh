@@ -10,6 +10,10 @@ EXECUTE_TIMEOUT=240
 
 cd ${BSIM_OUT_PATH}/bin
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 bsim_exe=./bs_${BOARD_TS}_tests_bsim_bluetooth_host_misc_hfc_prj_conf
 
 Execute "${bsim_exe}" -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=dut -rs=420

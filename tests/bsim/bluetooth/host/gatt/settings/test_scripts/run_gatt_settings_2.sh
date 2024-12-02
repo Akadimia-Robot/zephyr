@@ -8,6 +8,10 @@ source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 simulation_id="settings_2"
 verbosity_level=2
 EXECUTE_TIMEOUT=120
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 test_2_exe="./bs_${BOARD_TS}_$(guess_test_long_name)_prj_2_conf"
 
 cd ${BSIM_OUT_PATH}/bin

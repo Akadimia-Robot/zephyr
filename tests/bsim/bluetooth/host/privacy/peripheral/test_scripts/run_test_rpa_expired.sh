@@ -9,6 +9,10 @@ verbosity_level=2
 simulation_id="rpa_expired"
 EXECUTE_TIMEOUT=240
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 central_exe_rpa_expired="\
 ${BSIM_OUT_PATH}/bin/bs_${BOARD_TS}_$(guess_test_long_name)_prj_rpa_expired_conf"
 peripheral_exe_rpa_expired="${central_exe_rpa_expired}"

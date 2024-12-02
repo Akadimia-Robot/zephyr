@@ -16,6 +16,10 @@ verbosity_level=2
 
 cd ${BSIM_OUT_PATH}/bin
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_adv_extended_prj_advertiser_conf \
   -v=${verbosity_level} -s=${simulation_id} -d=0 -RealEncryption=0 \
   -testid=ext_adv_conn_advertiser_x5 -rs=23

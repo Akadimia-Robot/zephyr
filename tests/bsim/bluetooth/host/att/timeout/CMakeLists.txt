@@ -8,15 +8,15 @@ project(app)
 add_subdirectory(${ZEPHYR_BASE}/tests/bluetooth/common/testlib testlib)
 
 target_sources(app PRIVATE
-  ../long_read/bs_main.c
-  ../long_read/bs_sync.c
+  ../long_read/src/bs_main.c
+  ../long_read/src/bs_sync.c
   main.c
 )
 
 zephyr_include_directories(
   ${BSIM_COMPONENTS_PATH}/libPhyComv1/src/
   ${BSIM_COMPONENTS_PATH}/libUtilv1/src/
-  ../long_read/
+  ../long_read/src
 )
 
 target_link_libraries(app PRIVATE

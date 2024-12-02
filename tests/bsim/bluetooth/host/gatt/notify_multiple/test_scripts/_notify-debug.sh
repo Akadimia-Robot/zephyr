@@ -26,6 +26,10 @@ if [[ $2 == "debug" ]]; then
 fi
 
 if [[ $1 == "client" ]]; then
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 $GDB_P ./bs_${BOARD_TS}_tests_bsim_bluetooth_host_gatt_notify_multiple_prj_conf \
   -v=${verbosity_level} -s=${simulation_id} -d=0 -testid=gatt_client
 

@@ -8,6 +8,10 @@ source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 EXECUTE_TIMEOUT=120
 
 simulation_id="timeout"
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 dev_exe=bs_${BOARD_TS}_$(guess_test_long_name)_prj_conf
 args_all=(-s=${simulation_id} -D=2)
 args_dev=(-v=2 -RealEncryption=1 -testid=the_test)

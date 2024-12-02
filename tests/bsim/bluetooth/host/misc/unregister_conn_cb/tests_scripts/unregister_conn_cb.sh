@@ -13,6 +13,10 @@ source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 simulation_id="unregister_conn_cb"
 verbosity_level=2
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 bsim_exe=./bs_${BOARD_TS}_tests_bsim_bluetooth_host_misc_unregister_conn_cb_prj_conf
 
 cd ${BSIM_OUT_PATH}/bin

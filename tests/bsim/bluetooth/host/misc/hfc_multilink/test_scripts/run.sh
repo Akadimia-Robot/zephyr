@@ -15,6 +15,10 @@ verbosity_level=2
 # The test will be terminated much earlier if it passes
 SIM_LEN_US=$((10 * 1000 * 1000))
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 tester_exe="${BSIM_OUT_PATH}/bin/bs_${BOARD_TS}_${test_name}_tester_prj_conf"
 dut_exe="${BSIM_OUT_PATH}/bin/bs_${BOARD_TS}_${test_name}_dut_prj_conf"
 

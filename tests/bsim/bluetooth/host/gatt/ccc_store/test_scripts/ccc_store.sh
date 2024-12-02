@@ -4,6 +4,10 @@
 
 source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 test_exe="bs_${BOARD_TS}_$(guess_test_long_name)_prj_conf"
 simulation_id="ccc_store"
 verbosity_level=2

@@ -6,6 +6,10 @@ source ${ZEPHYR_BASE}/tests/bsim/sh_common.source
 
 simulation_id="$(guess_test_long_name)"
 verbosity_level=2
+if [ "${BOARD_TS}" = "nrf52_bsim" ]; then
+  BOARD_TS="${BOARD_TS}_native"
+fi
+
 test_exe="bs_${BOARD_TS}_$(guess_test_long_name)_prj_conf"
 
 cd ${BSIM_OUT_PATH}/bin
