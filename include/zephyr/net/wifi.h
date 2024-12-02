@@ -46,6 +46,8 @@ enum wifi_security_type {
 	WIFI_SECURITY_TYPE_PSK,
 	/** WPA2-PSK-SHA256 security. */
 	WIFI_SECURITY_TYPE_PSK_SHA256,
+	/** WPA2-PSK-SHA384 security. */
+	WIFI_SECURITY_TYPE_PSK_SHA384,
 	/** WPA3-SAE security. */
 	WIFI_SECURITY_TYPE_SAE,
 	/** WPA3-SAE security with hunting-and-pecking loop. */
@@ -78,6 +80,10 @@ enum wifi_security_type {
 	WIFI_SECURITY_TYPE_EAP_PEAP_TLS,
 	/** EAP TLS SHA256 security - Enterprise. */
 	WIFI_SECURITY_TYPE_EAP_TLS_SHA256,
+	/** EAP TLS SUITEB-SHA256 security - Enterprise. */
+	WIFI_SECURITY_TYPE_EAP_TLS_SUITEB_SHA256,
+	/** EAP TLS SUITEB-192 security - Enterprise. */
+	WIFI_SECURITY_TYPE_EAP_TLS_SUITEB_SHA384,
 	/** FT-PSK security */
 	WIFI_SECURITY_TYPE_FT_PSK,
 	/** FT-SAE security */
