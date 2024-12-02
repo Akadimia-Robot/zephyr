@@ -1,0 +1,37 @@
+/*
+ * Copyright 2024 NXP
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* Common dts file to enable supported features for CPU 1.
+ */
+/dts-v1/;
+
+#include <nxp/nxp_mcxn94x.dtsi>
+#include "frdm_mcxn947.dtsi"
+
+/ {
+	cpus {
+		/delete-node/ cpu@0;
+	};
+
+	chosen {
+		zephyr,sram = &sramg;
+		zephyr,flash = &slot1_partition;
+		zephyr,flash-controller = &fmu;
+		zephyr,code-partition = &slot1_partition;
+	};
+};
+
+&mbox {
+	status = "okay";
+};
+
+&w25q64jvssiq {
+	status = "okay";
+};
+
+&flexspi {
+	status = "okay";
+};

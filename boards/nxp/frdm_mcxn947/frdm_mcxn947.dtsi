@@ -132,6 +132,17 @@ nxp_8080_touch_panel_i2c: &flexcomm2_lpi2c2 {
 	status = "okay";
 };
 
+&sram {
+	sramg: memory@20050000 {
+		compatible = "mmio-sram";
+		reg = <0x20050000 DT_SIZE_K(64)>;
+	};
+	sramh: memory@20060000 {
+		compatible = "mmio-sram";
+		reg = <0x20060000 DT_SIZE_K(32)>;
+	};
+};
+
 &flash {
 	partitions {
 		compatible = "fixed-partitions";
