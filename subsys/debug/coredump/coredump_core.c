@@ -101,9 +101,9 @@ static void dump_thread(struct k_thread *thread)
 #if defined(CONFIG_COREDUMP_DEVICE)
 static void process_coredump_dev_memory(const struct device *dev)
 {
-	struct coredump_driver_api *api = (struct coredump_driver_api *)dev->api;
+	__ASSERT_NO_MSG(DEVICE_API_IS(coredump, dev));
 
-	api->dump(dev);
+	DEVICE_API_GET(coredump, dev)->dump(dev);
 }
 #endif
 
