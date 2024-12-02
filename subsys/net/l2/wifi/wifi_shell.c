@@ -576,6 +576,7 @@ static int __wifi_args_to_params(const struct shell *sh, size_t argc, char *argv
 		{"channel", required_argument, 0, 'c'},
 		{"timeout", required_argument, 0, 't'},
 		{"anon-id", required_argument, 0, 'a'},
+		{"bandwidth", required_argument, 0, 'B'},
 		{"key1-pwd", required_argument, 0, 'K'},
 		{"key2-pwd", required_argument, 0, 'K'},
 		{"suiteb-type", required_argument, 0, 'S'},
@@ -620,8 +621,9 @@ static int __wifi_args_to_params(const struct shell *sh, size_t argc, char *argv
 	params->security = WIFI_SECURITY_TYPE_NONE;
 	params->mfp = WIFI_MFP_OPTIONAL;
 	params->eap_ver = 1;
+	params->bandwidth = WIFI_FREQ_BANDWIDTH_20MHZ;
 
-	while ((opt = getopt_long(argc, argv, "s:p:k:e:w:b:c:m:t:a:K:S:V:I:P:Rh",
+	while ((opt = getopt_long(argc, argv, "s:p:k:e:w:b:c:m:t:a:B:K:S:V:I:P:Rh",
 				  long_options, &opt_index)) != -1) {
 		state = getopt_state_get();
 		switch (opt) {
@@ -732,6 +734,24 @@ static int __wifi_args_to_params(const struct shell *sh, size_t argc, char *argv
 				PR_WARNING("anon_id too long (max %d characters)\n",
 					    WIFI_ENT_IDENTITY_MAX_LEN);
 				return -EINVAL;
+			}
+			break;
+		case 'B':
+			if (iface_mode == WIFI_MODE_AP) {
+				switch (atoi(state->optarg)) {
+				case 1:
+					params->bandwidth = WIFI_FREQ_BANDWIDTH_20MHZ;
+					break;
+				case 2:
+					params->bandwidth = WIFI_FREQ_BANDWIDTH_40MHZ;
+					break;
+				case 3:
+					params->bandwidth = WIFI_FREQ_BANDWIDTH_80MHZ;
+					break;
+				default:
+					PR_ERROR("Invalid bandwidth: %d\n", atoi(state->optarg));
+					return -EINVAL;
+				}
 			}
 			break;
 		case 'K':
@@ -1821,11 +1841,15 @@ static int wifi_ap_config_args_to_params(const struct shell *sh, size_t argc, ch
 	static const struct option long_options[] = {
 		{"max_inactivity", required_argument, 0, 'i'},
 		{"max_num_sta", required_argument, 0, 's'},
+#if defined(CONFIG_WIFI_NM_WPA_SUPPLICANT)
+		{"ht_capab", required_argument, 0, 'n'},
+		{"vht_capab", required_argument, 0, 'c'},
+#endif
 		{"help", no_argument, 0, 'h'},
 		{0, 0, 0, 0}};
 	long val;
 
-	while ((opt = getopt_long(argc, argv, "i:s:h",
+	while ((opt = getopt_long(argc, argv, "i:s:n:c:h",
 				  long_options, &opt_index)) != -1) {
 		state = getopt_state_get();
 		switch (opt) {
@@ -1845,6 +1869,16 @@ static int wifi_ap_config_args_to_params(const struct shell *sh, size_t argc, ch
 			params->max_num_sta = (uint32_t)val;
 			params->type |= WIFI_AP_CONFIG_PARAM_MAX_NUM_STA;
 			break;
+#if defined(CONFIG_WIFI_NM_WPA_SUPPLICANT)
+		case 'n':
+			strncpy(params->ht_capab, state->optarg, WIFI_AP_IEEE_80211_CAPAB_MAX_LEN);
+			params->type |= WIFI_AP_CONFIG_PARAM_HT_CAPAB;
+			break;
+		case 'c':
+			strncpy(params->vht_capab, state->optarg, WIFI_AP_IEEE_80211_CAPAB_MAX_LEN);
+			params->type |= WIFI_AP_CONFIG_PARAM_VHT_CAPAB;
+			break;
+#endif
 		case 'h':
 			shell_help(sh);
 			return SHELL_CMD_HELP_PRINTED;
@@ -1861,11 +1895,7 @@ static int wifi_ap_config_args_to_params(const struct shell *sh, size_t argc, ch
 static int cmd_wifi_ap_config_params(const struct shell *sh, size_t argc,
 				     char *argv[])
 {
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	struct net_if *iface = net_if_get_wifi_sap();
-#else
-	struct net_if *iface = net_if_get_first_wifi();
-#endif
 	struct wifi_ap_config_params ap_config_params = { 0 };
 	int ret = -1;
 
@@ -3138,6 +3168,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      "0:Disable, 1:Optional, 2:Required\n"
 		      "-b --band=<band> (2 -2.6GHz, 5 - 5Ghz, 6 - 6GHz)\n"
 		      "-m --bssid=<BSSID>\n"
+		      "[-B, --bandwidth=<bandwidth>]: 1:20MHz, 2:40MHz, 3:80MHz\n"
 		      "[-K, --key1-pwd for eap phase1 or --key2-pwd for eap phase2]:\n"
 		      "Private key passwd for enterprise mode. Default no password for private key.\n"
 		      "[-S, --suiteb-type]: 1:suiteb, 2:suiteb-192. Default 0: not suiteb mode.\n"
@@ -3157,8 +3188,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      "Configure AP parameters.\n"
 		      "-i --max_inactivity=<time duration (in seconds)>\n"
 		      "-s --max_num_sta=<maximum number of stations>\n"
+#if defined(CONFIG_WIFI_NM_WPA_SUPPLICANT)
+		      "Please refer to hostapd.conf to set the following options,\n"
+		      "(e.g. \"ht_capab=[HT40+]\" is that \"-n [HT40-]\")\n"
+		      "-n --ht_capab=<HT capabilities (string)>\n"
+		      "-c --vht_capab=<VHT capabilities (string)>\n"
+#endif
 		      "-h --help (prints help)",
-		      cmd_wifi_ap_config_params, 2, 5),
+		      cmd_wifi_ap_config_params, 2, 10),
 	SHELL_CMD_ARG(wps_pbc, NULL,
 		      "Start AP WPS PBC session.\n",
 		      cmd_wifi_ap_wps_pbc, 1, 0),
