@@ -16,4 +16,5 @@ toolchain:
   - xtools
 supported:
   - gpio
+  - pwm
 vendor: nxp
