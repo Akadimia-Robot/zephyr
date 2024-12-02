@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 Fabian Blatz
+# SPDX-License-Identifier: Apache-2.0
+
+config STEP_DIR_STEPPER
+	bool
+	help
+	  Enable library used for step direction stepper drivers.
