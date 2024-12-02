@@ -48,10 +48,6 @@ enum {
 	ADV_FLAG_SENT,
 	/** Currently performing proxy advertising */
 	ADV_FLAG_PROXY,
-	/** The proxy has been start, but maybe pending. */
-	ADV_FLAG_PROXY_START,
-	/** The send-call has been pending. */
-	ADV_FLAG_SCHEDULE_PENDING,
 	/** Custom adv params have been set, we need to update the parameters on
 	 *  the next send.
 	 */
@@ -258,33 +254,61 @@ static const char * const adv_tag_to_str[] = {
 	[BT_MESH_ADV_TAG_PROV]   = "prov adv",
 };
 
-static bool schedule_send_with_mask(struct bt_mesh_ext_adv *ext_adv, int ignore_mask)
+static void do_proxy_adv_stop(struct bt_mesh_ext_adv *ext_adv)
 {
 	if (atomic_test_and_clear_bit(ext_adv->flags, ADV_FLAG_PROXY)) {
-		atomic_clear_bit(ext_adv->flags, ADV_FLAG_PROXY_START);
 		(void)bt_le_ext_adv_stop(ext_adv->instance);
 
 		atomic_clear_bit(ext_adv->flags, ADV_FLAG_ACTIVE);
 	}
+}
+
+static bool schedule_send_with_mask(struct bt_mesh_ext_adv *ext_adv, int ignore_mask)
+{
+	do_proxy_adv_stop(ext_adv);
 
 	if (atomic_test_bit(ext_adv->flags, ADV_FLAG_ACTIVE)) {
-		atomic_set_bit(ext_adv->flags, ADV_FLAG_SCHEDULE_PENDING);
 		return false;
 	} else if ((~ignore_mask) & k_work_busy_get(&ext_adv->work)) {
 		return false;
 	}
 
-	atomic_clear_bit(ext_adv->flags, ADV_FLAG_SCHEDULE_PENDING);
 	bt_mesh_wq_submit(&ext_adv->work);
 
 	return true;
+}
+
+static bool adv_send_handler(struct bt_mesh_adv *adv, struct bt_mesh_ext_adv *ext_adv)
+{
+	int err;
+
+	while (adv || (adv = bt_mesh_adv_get_by_tag(ext_adv->tags, K_NO_WAIT))) {
+		/* busy == 0 means this was canceled */
+		if (!adv->ctx.busy) {
+			bt_mesh_adv_unref(adv);
+			adv = NULL;
+			continue;
+		}
+
+		adv->ctx.busy = 0U;
+		err = adv_send(ext_adv, adv);
+
+		bt_mesh_adv_unref(adv);
+		adv = NULL;
+
+		if (!err) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static void send_pending_adv(struct k_work *work)
 {
 	struct bt_mesh_ext_adv *ext_adv;
 	struct bt_mesh_adv *adv;
-	int err;
+	bool sent;
 
 	ext_adv = CONTAINER_OF(work, struct bt_mesh_ext_adv, work);
 
@@ -301,7 +325,6 @@ static void send_pending_adv(struct k_work *work)
 
 		atomic_clear_bit(ext_adv->flags, ADV_FLAG_ACTIVE);
 		atomic_clear_bit(ext_adv->flags, ADV_FLAG_PROXY);
-		atomic_clear_bit(ext_adv->flags, ADV_FLAG_PROXY_START);
 
 		if (ext_adv->adv) {
 			struct bt_mesh_adv_ctx ctx = ext_adv->adv->ctx;
@@ -314,21 +337,9 @@ static void send_pending_adv(struct k_work *work)
 		}
 	}
 
-	while ((adv = bt_mesh_adv_get_by_tag(ext_adv->tags, K_NO_WAIT))) {
-		/* busy == 0 means this was canceled */
-		if (!adv->ctx.busy) {
-			bt_mesh_adv_unref(adv);
-			continue;
-		}
-
-		adv->ctx.busy = 0U;
-		err = adv_send(ext_adv, adv);
-
-		bt_mesh_adv_unref(adv);
-
-		if (!err) {
-			return; /* Wait for advertising to finish */
-		}
+	sent = adv_send_handler(NULL, ext_adv);
+	if (sent) {
+		return;
 	}
 
 	if (ext_adv->instance == NULL) {
@@ -346,14 +357,18 @@ static void send_pending_adv(struct k_work *work)
 		return;
 	}
 
-	atomic_set_bit(ext_adv->flags, ADV_FLAG_PROXY_START);
-
 	if (!bt_mesh_adv_gatt_send()) {
 		atomic_set_bit(ext_adv->flags, ADV_FLAG_PROXY);
 	}
 
-	if (atomic_test_and_clear_bit(ext_adv->flags, ADV_FLAG_SCHEDULE_PENDING)) {
-		schedule_send_with_mask(ext_adv, K_WORK_RUNNING);
+	/* If there is a pending adv during the process of starting the proxy advertising,
+	 * the proxy advertising needs to be stop and sent pending adv immediately.
+	 */
+	adv = bt_mesh_adv_get_by_tag(ext_adv->tags, K_NO_WAIT);
+	if (adv) {
+		do_proxy_adv_stop(ext_adv);
+
+		(void)adv_send_handler(adv, ext_adv);
 	}
 }
 
@@ -491,7 +506,7 @@ static void connected(struct bt_le_ext_adv *instance,
 {
 	struct bt_mesh_ext_adv *ext_adv = gatt_adv_get();
 
-	if (atomic_test_and_clear_bit(ext_adv->flags, ADV_FLAG_PROXY_START)) {
+	if (atomic_test_and_clear_bit(ext_adv->flags, ADV_FLAG_PROXY)) {
 		atomic_clear_bit(ext_adv->flags, ADV_FLAG_ACTIVE);
 		(void)schedule_send(ext_adv);
 	}
