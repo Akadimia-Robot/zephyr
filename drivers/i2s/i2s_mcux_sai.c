@@ -9,6 +9,8 @@
  * @brief I2S bus (SAI) driver for NXP i.MX RT series.
  */
 
+#define DT_DRV_COMPAT nxp_mcux_i2s
+
 #include <errno.h>
 #include <string.h>
 #include <zephyr/sys/__assert.h>
@@ -21,26 +23,30 @@
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/dt-bindings/clock/imx_ccm.h>
 #include <zephyr/sys/barrier.h>
+#include <zephyr/device.h>
 #include <soc.h>
 
-#include "i2s_mcux_sai.h"
+#include <fsl_sai.h>
+#include <fsl_edma.h>
 
-#define LOG_DOMAIN dev_i2s_mcux
-#define LOG_LEVEL  CONFIG_I2S_LOG_LEVEL
 #include <zephyr/logging/log.h>
-#include <zephyr/irq.h>
+LOG_MODULE_REGISTER(dev_i2s_nxp_sai, CONFIG_I2S_LOG_LEVEL);
 
-LOG_MODULE_REGISTER(LOG_DOMAIN);
-
-#define DT_DRV_COMPAT          nxp_mcux_i2s
 #define NUM_DMA_BLOCKS_RX_PREP 3
-#define MAX_TX_DMA_BLOCKS      CONFIG_DMA_TCD_QUEUE_SIZE
-#if (NUM_DMA_BLOCKS_RX_PREP >= CONFIG_DMA_TCD_QUEUE_SIZE)
-#error NUM_DMA_BLOCKS_RX_PREP must be < CONFIG_DMA_TCD_QUEUE_SIZE
-#endif
-#if defined(CONFIG_DMA_MCUX_EDMA) && (NUM_DMA_BLOCKS_RX_PREP < 3)
-#error eDMA avoids TCD coherency issue if NUM_DMA_BLOCKS_RX_PREP >= 3
-#endif
+#if defined(CONFIG_DMA_MCUX_EDMA)
+BUILD_ASSERT(NUM_DMA_BLOCKS_RX_PREP >= 3,
+	     "eDMA avoids TCD coherency issue if NUM_DMA_BLOCKS_RX_PREP >= 3");
+#endif /* CONFIG_DMA_MCUX_EDMA */
+
+#define MAX_TX_DMA_BLOCKS CONFIG_DMA_TCD_QUEUE_SIZE
+BUILD_ASSERT(MAX_TX_DMA_BLOCKS > NUM_DMA_BLOCKS_RX_PREP,
+	     "NUM_DMA_BLOCKS_RX_PREP must be < CONFIG_DMA_TCD_QUEUE_SIZE");
+
+#define SAI_WORD_SIZE_BITS_MIN 8
+#define SAI_WORD_SIZE_BITS_MAX 32
+
+#define SAI_WORD_PER_FRAME_MIN 0
+#define SAI_WORD_PER_FRAME_MAX 32
 
 /*
  * SAI driver uses source_gather_en/dest_scatter_en feature of DMA, and relies
@@ -65,7 +71,7 @@ LOG_MODULE_REGISTER(LOG_DOMAIN);
  *   (may optionally block) from out_queue and presented to application.
  */
 struct stream {
-	int32_t state;
+	enum i2s_state state;
 	uint32_t dma_channel;
 	uint32_t start_channel;
 	void (*irq_call_back)(void);
@@ -78,7 +84,7 @@ struct stream {
 	struct k_msgq out_queue;
 };
 
-struct i2s_mcux_config {
+struct i2s_nxp_sai_config {
 	I2S_Type *base;
 	uint32_t clk_src;
 	uint32_t clk_pre_div;
@@ -95,8 +101,8 @@ struct i2s_mcux_config {
 	const struct device *ccm_dev;
 	const struct pinctrl_dev_config *pinctrl;
 	void (*irq_connect)(const struct device *dev);
-	bool rx_sync_mode;
-	bool tx_sync_mode;
+	sai_sync_mode_t rx_sync_mode;
+	sai_sync_mode_t tx_sync_mode;
 };
 
 /* Device run time data */
@@ -110,12 +116,8 @@ struct i2s_dev_data {
 	void *rx_out_msgs[CONFIG_I2S_RX_BLOCK_COUNT];
 };
 
-static void i2s_dma_tx_callback(const struct device *, void *, uint32_t, int);
-static void i2s_tx_stream_disable(const struct device *, bool drop);
-static void i2s_rx_stream_disable(const struct device *, bool in_drop, bool out_drop);
-
-static inline void i2s_purge_stream_buffers(struct stream *strm, struct k_mem_slab *mem_slab,
-					    bool in_drop, bool out_drop)
+static void i2s_purge_stream_buffers(struct stream *strm, struct k_mem_slab *mem_slab, bool in_drop,
+				     bool out_drop)
 {
 	void *buffer;
 
@@ -137,7 +139,7 @@ static void i2s_tx_stream_disable(const struct device *dev, bool drop)
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->tx;
 	const struct device *dev_dma = dev_data->dev_dma;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 
 	LOG_DBG("Stopping DMA channel %u for TX stream", strm->dma_channel);
 
@@ -164,9 +166,7 @@ static void i2s_tx_stream_disable(const struct device *dev, bool drop)
 	}
 
 	/* purge buffers queued in the stream */
-	if (drop) {
-		i2s_purge_stream_buffers(strm, dev_data->tx.cfg.mem_slab, true, true);
-	}
+	i2s_purge_stream_buffers(strm, dev_data->tx.cfg.mem_slab, drop, drop);
 }
 
 static void i2s_rx_stream_disable(const struct device *dev, bool in_drop, bool out_drop)
@@ -174,7 +174,7 @@ static void i2s_rx_stream_disable(const struct device *dev, bool in_drop, bool o
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->rx;
 	const struct device *dev_dma = dev_data->dev_dma;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 
 	LOG_DBG("Stopping RX stream & DMA channel %u", strm->dma_channel);
 	dma_stop(dev_dma, strm->dma_channel);
@@ -197,15 +197,13 @@ static void i2s_rx_stream_disable(const struct device *dev, bool in_drop, bool o
 	dev_cfg->base->RCSR &= ~I2S_RCSR_SR_MASK;
 
 	/* purge buffers queued in the stream */
-	if (in_drop || out_drop) {
-		i2s_purge_stream_buffers(strm, dev_data->rx.cfg.mem_slab, in_drop, out_drop);
-	}
+	i2s_purge_stream_buffers(strm, dev_data->rx.cfg.mem_slab, in_drop, out_drop);
 }
 
 static int i2s_tx_reload_multiple_dma_blocks(const struct device *dev, uint8_t *blocks_queued)
 {
 	struct i2s_dev_data *dev_data = dev->data;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	struct stream *strm = &dev_data->tx;
 	void *buffer = NULL;
@@ -256,9 +254,9 @@ static void i2s_dma_tx_callback(const struct device *dma_dev, void *arg, uint32_
 	const struct device *dev = (struct device *)arg;
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->tx;
+	uint8_t blocks_queued;
 	void *buffer = NULL;
 	int ret;
-	uint8_t blocks_queued;
 
 	LOG_DBG("tx cb");
 
@@ -290,35 +288,30 @@ static void i2s_dma_tx_callback(const struct device *dma_dev, void *arg, uint32_
 		goto disabled_exit_no_drop;
 	}
 
-	switch (strm->state) {
-	case I2S_STATE_RUNNING:
-	case I2S_STATE_STOPPING:
-		ret = i2s_tx_reload_multiple_dma_blocks(dev, &blocks_queued);
-
-		if (ret) {
-			strm->state = I2S_STATE_ERROR;
-			goto disabled_exit_no_drop;
-		}
-
-		if (blocks_queued || (strm->free_tx_dma_blocks < MAX_TX_DMA_BLOCKS)) {
-			goto enabled_exit;
-		} else {
-			/* all DMA blocks are free but no blocks were queued */
-			if (strm->state == I2S_STATE_STOPPING) {
-				/* TX queue has drained */
-				strm->state = I2S_STATE_READY;
-				LOG_DBG("TX stream has stopped");
-			} else {
-				strm->state = I2S_STATE_ERROR;
-				LOG_ERR("TX Failed to reload DMA");
-			}
-			goto disabled_exit_no_drop;
-		}
-
-	case I2S_STATE_ERROR:
-	default:
+	if (strm->state != I2S_STATE_RUNNING && strm->state != I2S_STATE_STOPPING) {
 		goto disabled_exit_drop;
 	}
+
+	ret = i2s_tx_reload_multiple_dma_blocks(dev, &blocks_queued);
+	if (ret) {
+		strm->state = I2S_STATE_ERROR;
+		goto disabled_exit_no_drop;
+	}
+
+	if (blocks_queued || (strm->free_tx_dma_blocks < MAX_TX_DMA_BLOCKS)) {
+		goto enabled_exit;
+	}
+
+	/* all DMA blocks are free but no blocks were queued */
+	if (strm->state == I2S_STATE_STOPPING) {
+		/* TX queue has drained */
+		strm->state = I2S_STATE_READY;
+		LOG_DBG("TX stream has stopped");
+	} else {
+		strm->state = I2S_STATE_ERROR;
+		LOG_ERR("TX Failed to reload DMA");
+	}
+	goto disabled_exit_no_drop;
 
 disabled_exit_no_drop:
 	i2s_tx_stream_disable(dev, false);
@@ -336,7 +329,7 @@ static void i2s_dma_rx_callback(const struct device *dma_dev, void *arg, uint32_
 				int status)
 {
 	struct device *dev = (struct device *)arg;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->rx;
@@ -345,65 +338,67 @@ static void i2s_dma_rx_callback(const struct device *dma_dev, void *arg, uint32_
 
 	LOG_DBG("RX cb");
 
-	switch (strm->state) {
-	case I2S_STATE_STOPPING:
-	case I2S_STATE_RUNNING:
-		/* retrieve buffer from input queue */
-		ret = k_msgq_get(&strm->in_queue, &buffer, K_NO_WAIT);
-		__ASSERT_NO_MSG(ret == 0);
-
-		/* put buffer to output queue */
-		ret = k_msgq_put(&strm->out_queue, &buffer, K_NO_WAIT);
-		if (ret != 0) {
-			LOG_ERR("buffer %p -> out_queue %p err %d", buffer, &strm->out_queue, ret);
-			i2s_rx_stream_disable(dev, false, false);
-			strm->state = I2S_STATE_ERROR;
-			return;
-		}
-		if (strm->state == I2S_STATE_RUNNING) {
-			/* allocate new buffer for next audio frame */
-			ret = k_mem_slab_alloc(strm->cfg.mem_slab, &buffer, K_NO_WAIT);
-			if (ret != 0) {
-				LOG_ERR("buffer alloc from slab %p err %d", strm->cfg.mem_slab,
-					ret);
-				i2s_rx_stream_disable(dev, false, false);
-				strm->state = I2S_STATE_ERROR;
-			} else {
-				uint32_t data_path = strm->start_channel;
-
-				ret = dma_reload(dev_data->dev_dma, strm->dma_channel,
-						 (uint32_t)&base->RDR[data_path], (uint32_t)buffer,
-						 strm->cfg.block_size);
-				if (ret != 0) {
-					LOG_ERR("dma_reload() failed with error 0x%x", ret);
-					i2s_rx_stream_disable(dev, false, false);
-					strm->state = I2S_STATE_ERROR;
-					return;
-				}
-
-				/* put buffer in input queue */
-				ret = k_msgq_put(&strm->in_queue, &buffer, K_NO_WAIT);
-				if (ret != 0) {
-					LOG_ERR("%p -> in_queue %p err %d", buffer, &strm->in_queue,
-						ret);
-				}
-
-			}
-		} else {
-			i2s_rx_stream_disable(dev, true, false);
-			/* Received a STOP/DRAIN trigger */
-			strm->state = I2S_STATE_READY;
-		}
-		break;
-	case I2S_STATE_ERROR:
+	if (strm->state == I2S_STATE_ERROR) {
 		i2s_rx_stream_disable(dev, true, true);
-		break;
 	}
+
+	if (strm->state != I2S_STATE_STOPPING && strm->state != I2S_STATE_RUNNING) {
+		return;
+	}
+
+	/* retrieve buffer from input queue */
+	ret = k_msgq_get(&strm->in_queue, &buffer, K_NO_WAIT);
+	__ASSERT_NO_MSG(ret == 0);
+
+	/* put buffer to output queue */
+	ret = k_msgq_put(&strm->out_queue, &buffer, K_NO_WAIT);
+	if (ret != 0) {
+		LOG_ERR("buffer %p -> out_queue %p err %d", buffer, &strm->out_queue, ret);
+		goto error;
+	}
+
+	if (strm->state == I2S_STATE_STOPPING) {
+		i2s_rx_stream_disable(dev, true, false);
+		/* Received a STOP/DRAIN trigger */
+		strm->state = I2S_STATE_READY;
+		return;
+	}
+
+	/* Now the only possible case is the running state */
+
+	/* allocate new buffer for next audio frame */
+	ret = k_mem_slab_alloc(strm->cfg.mem_slab, &buffer, K_NO_WAIT);
+	if (ret != 0) {
+		LOG_ERR("buffer alloc from slab %p err %d", strm->cfg.mem_slab, ret);
+		goto error;
+	}
+
+	uint32_t data_path = strm->start_channel;
+
+	ret = dma_reload(dev_data->dev_dma, strm->dma_channel,
+			 (uint32_t)&base->RDR[data_path], (uint32_t)buffer,
+			 strm->cfg.block_size);
+	if (ret != 0) {
+		LOG_ERR("dma_reload() failed with error 0x%x", ret);
+		goto error;
+	}
+
+	/* put buffer in input queue */
+	ret = k_msgq_put(&strm->in_queue, &buffer, K_NO_WAIT);
+	if (ret != 0) {
+		LOG_ERR("%p -> in_queue %p err %d", buffer, &strm->in_queue, ret);
+	}
+
+	return;
+
+error:
+	i2s_rx_stream_disable(dev, false, false);
+	strm->state = I2S_STATE_ERROR;
 }
 
 static void enable_mclk_direction(const struct device *dev, bool dir)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	uint32_t offset = dev_cfg->mclk_pin_offset;
 	uint32_t mask = dev_cfg->mclk_pin_mask;
 	uint32_t *gpr = (uint32_t *)(DT_REG_ADDR(DT_NODELABEL(iomuxcgpr)) + offset);
@@ -417,7 +412,7 @@ static void enable_mclk_direction(const struct device *dev, bool dir)
 
 static void get_mclk_rate(const struct device *dev, uint32_t *mclk)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	const struct device *ccm_dev = dev_cfg->ccm_dev;
 	clock_control_subsys_t clk_sub_sys = dev_cfg->clk_sub_sys;
 	uint32_t rate = 0;
@@ -432,69 +427,48 @@ static void get_mclk_rate(const struct device *dev, uint32_t *mclk)
 	*mclk = rate;
 }
 
-static int i2s_mcux_config(const struct device *dev, enum i2s_dir dir,
-			   const struct i2s_config *i2s_cfg)
+static int i2s_nxp_sai_config(const struct device *dev, enum i2s_dir dir,
+			      const struct i2s_config *i2s_cfg)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	struct i2s_dev_data *dev_data = dev->data;
-	sai_transceiver_t config;
-	uint32_t mclk;
-	/*num_words is frame size*/
-	uint8_t num_words = i2s_cfg->channels;
+	enum i2s_state *tx_state = &(dev_data->tx.state);
+	enum i2s_state *rx_state = &(dev_data->rx.state);
 	uint8_t word_size_bits = i2s_cfg->word_size;
+	uint8_t word_size_bytes = word_size_bits / 8;
+	uint8_t num_words = i2s_cfg->channels;
+	sai_transceiver_t config;
+	int ret = -EINVAL;
+	uint32_t mclk;
 
 	if ((dev_data->tx.state != I2S_STATE_NOT_READY) &&
 	    (dev_data->tx.state != I2S_STATE_READY) &&
 	    (dev_data->rx.state != I2S_STATE_NOT_READY) &&
 	    (dev_data->rx.state != I2S_STATE_READY)) {
 		LOG_ERR("invalid state tx(%u) rx(%u)", dev_data->tx.state, dev_data->rx.state);
-		if (dir == I2S_DIR_TX) {
-			dev_data->tx.state = I2S_STATE_NOT_READY;
-		} else {
-			dev_data->rx.state = I2S_STATE_NOT_READY;
-		}
-		return -EINVAL;
+		goto invalid_config;
 	}
 
 	if (i2s_cfg->frame_clk_freq == 0U) {
 		LOG_ERR("Invalid frame_clk_freq %u", i2s_cfg->frame_clk_freq);
-		if (dir == I2S_DIR_TX) {
-			dev_data->tx.state = I2S_STATE_NOT_READY;
-		} else {
-			dev_data->rx.state = I2S_STATE_NOT_READY;
-		}
-		return 0;
+		goto invalid_config;
 	}
 
 	if (word_size_bits < SAI_WORD_SIZE_BITS_MIN || word_size_bits > SAI_WORD_SIZE_BITS_MAX) {
 		LOG_ERR("Unsupported I2S word size %u", word_size_bits);
-		if (dir == I2S_DIR_TX) {
-			dev_data->tx.state = I2S_STATE_NOT_READY;
-		} else {
-			dev_data->rx.state = I2S_STATE_NOT_READY;
-		}
-		return -EINVAL;
+		goto invalid_config;
 	}
 
 	if (num_words < SAI_WORD_PER_FRAME_MIN || num_words > SAI_WORD_PER_FRAME_MAX) {
 		LOG_ERR("Unsupported words length %u", num_words);
-		if (dir == I2S_DIR_TX) {
-			dev_data->tx.state = I2S_STATE_NOT_READY;
-		} else {
-			dev_data->rx.state = I2S_STATE_NOT_READY;
-		}
-		return -EINVAL;
+		goto invalid_config;
 	}
 
 	if ((i2s_cfg->options & I2S_OPT_PINGPONG) == I2S_OPT_PINGPONG) {
 		LOG_ERR("Ping-pong mode not supported");
-		if (dir == I2S_DIR_TX) {
-			dev_data->tx.state = I2S_STATE_NOT_READY;
-		} else {
-			dev_data->rx.state = I2S_STATE_NOT_READY;
-		}
-		return -ENOTSUP;
+		ret = -ENOTSUP;
+		goto invalid_config;
 	}
 
 	memset(&config, 0, sizeof(config));
@@ -552,43 +526,28 @@ static int i2s_mcux_config(const struct device *dev, enum i2s_dir dir,
 		break;
 	default:
 		LOG_ERR("Unsupported I2S data format");
-		if (dir == I2S_DIR_TX) {
-			dev_data->tx.state = I2S_STATE_NOT_READY;
-		} else {
-			dev_data->rx.state = I2S_STATE_NOT_READY;
-		}
-		return -EINVAL;
+		ret = -EINVAL;
+		goto invalid_config;
 	}
 
 	/* sync mode configurations */
 	if (dir == I2S_DIR_TX) {
-		/* TX */
-		if (dev_cfg->tx_sync_mode) {
-			config.syncMode = kSAI_ModeSync;
-		} else {
-			config.syncMode = kSAI_ModeAsync;
-		}
-	} else {
-		/* RX */
-		if (dev_cfg->rx_sync_mode) {
-			config.syncMode = kSAI_ModeSync;
-		} else {
-			config.syncMode = kSAI_ModeAsync;
-		}
+		config.syncMode = dev_cfg->tx_sync_mode;
+	} else if (dir == I2S_DIR_RX) {
+		config.syncMode = dev_cfg->rx_sync_mode;
 	}
 
-	if (i2s_cfg->options & I2S_OPT_FRAME_CLK_SLAVE) {
-		if (i2s_cfg->options & I2S_OPT_BIT_CLK_SLAVE) {
-			config.masterSlave = kSAI_Slave;
-		} else {
-			config.masterSlave = kSAI_Bclk_Master_FrameSync_Slave;
-		}
+	bool frame_clk_slave = i2s_cfg->options & I2S_OPT_FRAME_CLK_SLAVE;
+	bool bit_clk_slave = i2s_cfg->options & I2S_OPT_BIT_CLK_SLAVE;
+
+	if (frame_clk_slave && bit_clk_slave) {
+		config.masterSlave = kSAI_Slave;
+	} else if (frame_clk_slave && !bit_clk_slave) {
+		config.masterSlave = kSAI_Bclk_Master_FrameSync_Slave;
+	} else if (!frame_clk_slave && bit_clk_slave) {
+		config.masterSlave = kSAI_Bclk_Slave_FrameSync_Master;
 	} else {
-		if (i2s_cfg->options & I2S_OPT_BIT_CLK_SLAVE) {
-			config.masterSlave = kSAI_Bclk_Slave_FrameSync_Master;
-		} else {
-			config.masterSlave = kSAI_Master;
-		}
+		config.masterSlave = kSAI_Master;
 	}
 
 	/* clock signal polarity */
@@ -604,7 +563,6 @@ static int i2s_mcux_config(const struct device *dev, enum i2s_dir dir,
 				? kSAI_SampleOnRisingEdge
 				: kSAI_SampleOnFallingEdge;
 		break;
-
 	case I2S_FMT_CLK_IF_NB:
 		/* Swap frame sync polarity */
 		config.frameSync.frameSyncPolarity =
@@ -612,7 +570,6 @@ static int i2s_mcux_config(const struct device *dev, enum i2s_dir dir,
 				? kSAI_PolarityActiveLow
 				: kSAI_PolarityActiveHigh;
 		break;
-
 	case I2S_FMT_CLK_IF_IB:
 		/* Swap frame sync and bclk polarity */
 		config.frameSync.frameSyncPolarity =
@@ -647,10 +604,10 @@ static int i2s_mcux_config(const struct device *dev, enum i2s_dir dir,
 				      i2s_cfg->channels);
 		LOG_DBG("tx start_channel = %d", dev_data->tx.start_channel);
 		/*set up dma settings*/
-		dev_data->tx.dma_cfg.source_data_size = word_size_bits / 8;
-		dev_data->tx.dma_cfg.dest_data_size = word_size_bits / 8;
-		dev_data->tx.dma_cfg.source_burst_length = i2s_cfg->word_size / 8;
-		dev_data->tx.dma_cfg.dest_burst_length = i2s_cfg->word_size / 8;
+		dev_data->tx.dma_cfg.source_data_size = word_size_bytes;
+		dev_data->tx.dma_cfg.dest_data_size = word_size_bytes;
+		dev_data->tx.dma_cfg.source_burst_length = word_size_bytes;
+		dev_data->tx.dma_cfg.dest_burst_length = word_size_bytes;
 		dev_data->tx.dma_cfg.user_data = (void *)dev;
 		dev_data->tx.state = I2S_STATE_READY;
 	} else {
@@ -670,18 +627,26 @@ static int i2s_mcux_config(const struct device *dev, enum i2s_dir dir,
 				      i2s_cfg->channels);
 		LOG_DBG("rx start_channel = %d", dev_data->rx.start_channel);
 		/*set up dma settings*/
-		dev_data->rx.dma_cfg.source_data_size = word_size_bits / 8;
-		dev_data->rx.dma_cfg.dest_data_size = word_size_bits / 8;
-		dev_data->rx.dma_cfg.source_burst_length = i2s_cfg->word_size / 8;
-		dev_data->rx.dma_cfg.dest_burst_length = i2s_cfg->word_size / 8;
+		dev_data->rx.dma_cfg.source_data_size = word_size_bytes;
+		dev_data->rx.dma_cfg.dest_data_size = word_size_bytes;
+		dev_data->rx.dma_cfg.source_burst_length = word_size_bytes;
+		dev_data->rx.dma_cfg.dest_burst_length = word_size_bytes;
 		dev_data->rx.dma_cfg.user_data = (void *)dev;
 		dev_data->rx.state = I2S_STATE_READY;
 	}
 
 	return 0;
+
+invalid_config:
+	if (dir == I2S_DIR_TX) {
+		*tx_state = I2S_STATE_NOT_READY;
+	} else if (dir == I2S_DIR_RX) {
+		*rx_state = I2S_STATE_NOT_READY;
+	}
+	return ret;
 }
 
-const struct i2s_config *i2s_mcux_config_get(const struct device *dev, enum i2s_dir dir)
+const struct i2s_config *i2s_nxp_sai_config_get(const struct device *dev, enum i2s_dir dir)
 {
 	struct i2s_dev_data *dev_data = dev->data;
 
@@ -699,7 +664,7 @@ static int i2s_tx_stream_start(const struct device *dev)
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->tx;
 	const struct device *dev_dma = dev_data->dev_dma;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 
 	/* retrieve buffer from input queue */
@@ -774,7 +739,7 @@ static int i2s_rx_stream_start(const struct device *dev)
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->rx;
 	const struct device *dev_dma = dev_data->dev_dma;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	uint8_t num_of_bufs;
 
@@ -865,7 +830,7 @@ static int i2s_rx_stream_start(const struct device *dev)
 	return 0;
 }
 
-static int i2s_mcux_trigger(const struct device *dev, enum i2s_dir dir, enum i2s_trigger_cmd cmd)
+static int i2s_nxp_sai_trigger(const struct device *dev, enum i2s_dir dir, enum i2s_trigger_cmd cmd)
 {
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm;
@@ -962,14 +927,14 @@ static int i2s_mcux_trigger(const struct device *dev, enum i2s_dir dir, enum i2s
 	return ret;
 }
 
-static int i2s_mcux_read(const struct device *dev, void **mem_block, size_t *size)
+static int i2s_nxp_sai_read(const struct device *dev, void **mem_block, size_t *size)
 {
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->rx;
 	void *buffer;
 	int status, ret = 0;
 
-	LOG_DBG("i2s_mcux_read");
+	LOG_DBG("i2s_nxp_sai_read");
 	if (strm->state == I2S_STATE_NOT_READY) {
 		LOG_ERR("invalid state %d", strm->state);
 		return -EIO;
@@ -991,13 +956,13 @@ static int i2s_mcux_read(const struct device *dev, void **mem_block, size_t *siz
 	return 0;
 }
 
-static int i2s_mcux_write(const struct device *dev, void *mem_block, size_t size)
+static int i2s_nxp_sai_write(const struct device *dev, void *mem_block, size_t size)
 {
 	struct i2s_dev_data *dev_data = dev->data;
 	struct stream *strm = &dev_data->tx;
 	int ret;
 
-	LOG_DBG("i2s_mcux_write");
+	LOG_DBG("i2s_nxp_sai_write");
 	if (strm->state != I2S_STATE_RUNNING && strm->state != I2S_STATE_READY) {
 		LOG_ERR("invalid state (%d)", strm->state);
 		return -EIO;
@@ -1014,7 +979,7 @@ static int i2s_mcux_write(const struct device *dev, void *mem_block, size_t size
 
 static void sai_driver_irq(const struct device *dev)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 
 	if ((base->TCSR & I2S_TCSR_FEF_MASK) == I2S_TCSR_FEF_MASK) {
@@ -1039,10 +1004,10 @@ static void sai_driver_irq(const struct device *dev)
 }
 
 /* clear IRQ sources atm */
-static void i2s_mcux_isr(void *arg)
+static void i2s_nxp_sai_isr(void *arg)
 {
 	struct device *dev = (struct device *)arg;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 
 	if ((base->RCSR & I2S_TCSR_FEF_MASK) == I2S_TCSR_FEF_MASK) {
@@ -1065,7 +1030,7 @@ static void i2s_mcux_isr(void *arg)
 static void audio_clock_settings(const struct device *dev)
 {
 	clock_audio_pll_config_t audioPllConfig;
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	uint32_t clock_name = (uint32_t)dev_cfg->clk_sub_sys;
 
 	/*Clock setting for SAI*/
@@ -1091,9 +1056,9 @@ static void audio_clock_settings(const struct device *dev)
 	CLOCK_InitAudioPll(&audioPllConfig);
 }
 
-static int i2s_mcux_initialize(const struct device *dev)
+static int i2s_nxp_sai_initialize(const struct device *dev)
 {
-	const struct i2s_mcux_config *dev_cfg = dev->config;
+	const struct i2s_nxp_sai_config *dev_cfg = dev->config;
 	I2S_Type *base = (I2S_Type *)dev_cfg->base;
 	struct i2s_dev_data *dev_data = dev->data;
 	uint32_t mclk;
@@ -1159,20 +1124,20 @@ static int i2s_mcux_initialize(const struct device *dev)
 	return 0;
 }
 
-static const struct i2s_driver_api i2s_mcux_driver_api = {
-	.configure = i2s_mcux_config,
-	.read = i2s_mcux_read,
-	.write = i2s_mcux_write,
-	.config_get = i2s_mcux_config_get,
-	.trigger = i2s_mcux_trigger,
+static const struct i2s_driver_api i2s_nxp_sai_driver_api = {
+	.configure = i2s_nxp_sai_config,
+	.read = i2s_nxp_sai_read,
+	.write = i2s_nxp_sai_write,
+	.config_get = i2s_nxp_sai_config_get,
+	.trigger = i2s_nxp_sai_trigger,
 };
 
-#define I2S_MCUX_INIT(i2s_id)                                                                      \
+#define i2s_nxp_sai_INIT(i2s_id)                                                                   \
 	static void i2s_irq_connect_##i2s_id(const struct device *dev);                            \
                                                                                                    \
 	PINCTRL_DT_INST_DEFINE(i2s_id);                                                            \
                                                                                                    \
-	static const struct i2s_mcux_config i2s_##i2s_id##_config = {                              \
+	static const struct i2s_nxp_sai_config i2s_##i2s_id##_config = {                           \
 		.base = (I2S_Type *)DT_INST_REG_ADDR(i2s_id),                                      \
 		.clk_src = DT_INST_PROP(i2s_id, clock_mux),                                        \
 		.clk_pre_div = DT_INST_PROP(i2s_id, pre_div),                                      \
@@ -1189,8 +1154,10 @@ static const struct i2s_driver_api i2s_mcux_driver_api = {
 		.ccm_dev = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(i2s_id)),                             \
 		.irq_connect = i2s_irq_connect_##i2s_id,                                           \
 		.pinctrl = PINCTRL_DT_INST_DEV_CONFIG_GET(i2s_id),                                 \
-		.tx_sync_mode = DT_INST_PROP(i2s_id, nxp_tx_sync_mode),                            \
-		.rx_sync_mode = DT_INST_PROP(i2s_id, nxp_rx_sync_mode),                            \
+		.tx_sync_mode =                                                                    \
+			DT_INST_PROP(i2s_id, nxp_tx_sync_mode) ? kSAI_ModeSync : kSAI_ModeAsync,   \
+		.rx_sync_mode =                                                                    \
+			DT_INST_PROP(i2s_id, nxp_rx_sync_mode) ? kSAI_ModeSync : kSAI_ModeAsync,   \
 		.tx_channel = DT_INST_PROP(i2s_id, nxp_tx_channel),                                \
 	};                                                                                         \
                                                                                                    \
@@ -1234,16 +1201,16 @@ static const struct i2s_driver_api i2s_mcux_driver_api = {
 			},                                                                         \
 	};                                                                                         \
                                                                                                    \
-	DEVICE_DT_INST_DEFINE(i2s_id, &i2s_mcux_initialize, NULL, &i2s_##i2s_id##_data,            \
+	DEVICE_DT_INST_DEFINE(i2s_id, &i2s_nxp_sai_initialize, NULL, &i2s_##i2s_id##_data,         \
 			      &i2s_##i2s_id##_config, POST_KERNEL, CONFIG_I2S_INIT_PRIORITY,       \
-			      &i2s_mcux_driver_api);                                               \
+			      &i2s_nxp_sai_driver_api);                                            \
                                                                                                    \
 	static void i2s_irq_connect_##i2s_id(const struct device *dev)                             \
 	{                                                                                          \
 		IRQ_CONNECT(DT_INST_IRQ_BY_IDX(i2s_id, 0, irq),                                    \
-			    DT_INST_IRQ_BY_IDX(i2s_id, 0, priority), i2s_mcux_isr,                 \
+			    DT_INST_IRQ_BY_IDX(i2s_id, 0, priority), i2s_nxp_sai_isr,              \
 			    DEVICE_DT_INST_GET(i2s_id), 0);                                        \
 		irq_enable(DT_INST_IRQN(i2s_id));                                                  \
 	}
 
-DT_INST_FOREACH_STATUS_OKAY(I2S_MCUX_INIT)
+DT_INST_FOREACH_STATUS_OKAY(i2s_nxp_sai_INIT)
