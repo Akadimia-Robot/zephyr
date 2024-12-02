@@ -124,19 +124,7 @@ class TwisterConfigParser:
             if isinstance(value, list):
                 return value
             elif isinstance(value, str):
-                vs = v.split()
-
-                if len(vs) > 1:
-                    warnings.warn(
-                        "Space-separated lists are deprecated, use YAML lists instead",
-                        DeprecationWarning,
-                        stacklevel=2
-                    )
-
-                if len(typestr) > 4 and typestr[4] == ":":
-                    return [self._cast_value(vsi, typestr[5:]) for vsi in vs]
-                else:
-                    return vs
+                return [value]
             else:
                 raise ValueError
 
@@ -144,19 +132,7 @@ class TwisterConfigParser:
             if isinstance(value, list):
                 return set(value)
             elif isinstance(value, str):
-                vs = v.split()
-
-                if len(vs) > 1:
-                    warnings.warn(
-                        "Space-separated lists are deprecated, use YAML lists instead",
-                        DeprecationWarning,
-                        stacklevel=2
-                    )
-
-                if len(typestr) > 3 and typestr[3] == ":":
-                    return {self._cast_value(vsi, typestr[4:]) for vsi in vs}
-                else:
-                    return set(vs)
+                return {value}
             else:
                 raise ValueError
 
