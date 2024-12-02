@@ -27,6 +27,7 @@
 	aliases{
 		watchdog0 = &wwdt0;
 		pwm-0 = &flexpwm1_pwm0;
+		rtc = &rtc;
 	};
 };
 
@@ -140,5 +141,9 @@
 };
 
 &mrt0_channel0 {
+	status = "okay";
+};
+
+&rtc {
 	status = "okay";
 };
