@@ -165,7 +165,6 @@ union send_ntb {
 union recv_ntb {
 	struct {
 		struct nth16 nth;
-		struct ndp16 ndp;
 	};
 
 	uint8_t data[CDC_NCM_RECV_NTB_MAX_SIZE];
@@ -374,7 +373,7 @@ static int verify_nth16(const union recv_ntb *ntb, uint16_t len, uint16_t seq)
 		return -EINVAL;
 	}
 
-	if (sys_le16_to_cpu(nthdr16->wBlockLength) > len) {
+	if (sys_le16_to_cpu(nthdr16->wBlockLength) != len) {
 		LOG_DBG("DROP: %s len %d", "block",
 			sys_le16_to_cpu(nthdr16->wBlockLength));
 		return -EINVAL;
@@ -441,6 +440,7 @@ static int check_frame(struct cdc_ncm_eth_data *data, struct net_buf *const buf)
 	/* TODO: support nth32 */
 	ret = verify_nth16(ntb, len, data->rx_seq);
 	if (ret < 0) {
+		LOG_ERR("Failed to verify NTH16");
 		return ret;
 	}
 
@@ -511,12 +511,15 @@ static int cdc_ncm_acl_out_cb(struct usbd_class_data *const c_data,
 	const union recv_ntb *ntb = (union recv_ntb *)buf->data;
 	struct cdc_ncm_eth_data *data = dev->data;
 	const struct ndp16_datagram *ndp_datagram;
+	const struct nth16 *nthdr16;
+	const struct ndp16 *ndp;
 	struct net_pkt *pkt, *src;
 	uint16_t start, len;
 	uint16_t count;
 	int ret;
 
 	if (err || buf->len == 0) {
+		LOG_ERR("Bulk OUT transfer error or zero length");
 		net_buf_unref(buf);
 		atomic_clear_bit(&data->state, CDC_NCM_OUT_ENGAGED);
 		return 0;
@@ -524,34 +527,49 @@ static int cdc_ncm_acl_out_cb(struct usbd_class_data *const c_data,
 
 	ret = check_frame(data, buf);
 	if (ret < 0) {
-		LOG_DBG("check frame failed (%d)", ret);
+		LOG_ERR("check frame failed (%d)", ret);
 		goto restart_out_transfer;
 	}
-
-	ntb = (union recv_ntb *)buf->data;
-	ndp_datagram = (struct ndp16_datagram *)
-		(ntb->data + sys_le16_to_cpu(ntb->nth.wNdpIndex) + sizeof(struct ndp16));
 
 	/* Temporary source pkt we use to copy one Ethernet frame from
 	 * the list of USB net_buf's.
 	 */
 	src = net_pkt_alloc(K_MSEC(NET_PKT_ALLOC_TIMEOUT));
 	if (src == NULL) {
-		LOG_DBG("src packet alloc fail");
+		LOG_ERR("src packet alloc fail");
 		goto restart_out_transfer;
 	}
 
 	net_pkt_append_buffer(src, buf);
 	net_pkt_set_overwrite(src, true);
 
-	count = (sys_le16_to_cpu(ntb->ndp.wLength) - 12U) / 4U;
-	LOG_DBG("%u Ethernet frame%s received", count, count == 1 ? "" : "s");
+	nthdr16 = &ntb->nth;
+	LOG_DBG("NTH16: wSequence %u wBlockLength %u wNdpIndex %u",
+		nthdr16->wSequence, nthdr16->wBlockLength, nthdr16->wNdpIndex);
+
+	/* NDP may be anywhere in the transfer buffer. Offsets, like wNdpIndex
+	 * or wDatagramIndex are always of from byte zero of the NTB.
+	 */
+	ndp = (const struct ndp16 *)(ntb->data + sys_le16_to_cpu(nthdr16->wNdpIndex));
+	LOG_DBG("NDP16: wLength %u", sys_le16_to_cpu(ndp->wLength));
+
+	ndp_datagram = (struct ndp16_datagram *)&ndp->datagram[0];
+
+	/* There is one (terminating zero) or more datagram pointer
+	 * entries starting after 8 bytes of header information.
+	 */
+	count = (sys_le16_to_cpu(ndp->wLength) - 8U) / 4U;
+	LOG_DBG("%u datagram%s received", count, count == 1 ? "" : "s");
 
 	for (int i = 0; i < count; i++) {
 		start = sys_le16_to_cpu(ndp_datagram[i].wDatagramIndex);
 		len = sys_le16_to_cpu(ndp_datagram[i].wDatagramLength);
 
 		LOG_DBG("[%d] start %u len %u", i, start, len);
+		if (start == 0 || len == 0) {
+			LOG_DBG("Terminating zero datagram %u", i);
+			break;
+		}
 
 		pkt = net_pkt_rx_alloc_with_buffer(data->iface, len, AF_UNSPEC, 0, K_FOREVER);
 		if (!pkt) {
@@ -913,8 +931,8 @@ static int usbd_cdc_ncm_cth(struct usbd_class_data *const c_data,
 
 	case GET_NTB_INPUT_SIZE: {
 		struct ntb_input_size input_size = {
-			.dwNtbInMaxSize = sys_cpu_to_le32(CDC_NCM_RECV_NTB_MAX_SIZE),
-			.wNtbInMaxDatagrams = sys_cpu_to_le16(CDC_NCM_RECV_MAX_DATAGRAMS_PER_NTB),
+			.dwNtbInMaxSize = sys_cpu_to_le32(CDC_NCM_SEND_NTB_MAX_SIZE),
+			.wNtbInMaxDatagrams = sys_cpu_to_le16(CDC_NCM_SEND_MAX_DATAGRAMS_PER_NTB),
 			.wReserved = sys_cpu_to_le16(0),
 		};
 
