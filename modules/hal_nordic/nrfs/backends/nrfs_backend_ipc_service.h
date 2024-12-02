@@ -86,6 +86,19 @@ nrfs_err_t nrfs_backend_send_ex(void *message, size_t size, k_timeout_t timeout,
  */
 void nrfs_backend_fatal_error_handler(enum nrfs_backend_error error_id);
 
+/**
+ * @brief Type to use as callback function when nrfs is connected
+ */
+typedef void (*nrfs_backend_connected_clb)(void);
+
+/**
+ * @brief Register callback function to notify when nrfs is connected
+ *
+ * @param clb callback function
+ * @return int 0 if success, EINVAL on error
+ */
+int nrfs_backend_register_connected_callback(nrfs_backend_connected_clb clb);
+
 #ifdef __cplusplus
 }
 #endif

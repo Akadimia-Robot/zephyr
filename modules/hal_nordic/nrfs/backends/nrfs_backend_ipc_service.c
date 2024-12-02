@@ -54,6 +54,8 @@ static struct ipc_channel_config ipc_cpusys_channel_config = {
 	.enabled	 = true
 };
 
+static nrfs_backend_connected_clb nrfs_connected_clb;
+
 /**
  * @brief nrfs backend error handler
  *
@@ -98,6 +100,10 @@ static void ipc_sysctrl_ept_bound(void *priv)
 
 	if (k_msgq_num_used_get(&ipc_transmit_msgq) > 0) {
 		k_work_submit(&backend_send_work);
+	}
+
+	if (nrfs_connected_clb) {
+		nrfs_connected_clb();
 	}
 }
 
@@ -217,6 +223,18 @@ int nrfs_backend_wait_for_connection(k_timeout_t timeout)
 	events = k_event_wait(&ipc_connected_event, IPC_INIT_DONE_EVENT, false, timeout);
 
 	return (events == IPC_INIT_DONE_EVENT ? 0 : (-EAGAIN));
+}
+
+int nrfs_backend_register_connected_callback(nrfs_backend_connected_clb clb)
+{
+	if (clb) {
+		LOG_DBG("Registered nrfs connected callback");
+		nrfs_connected_clb = clb;
+		return 0;
+	}
+
+	LOG_ERR("Invalid callback function provided!");
+	return -EINVAL;
 }
 
 __weak void nrfs_backend_fatal_error_handler(enum nrfs_backend_error error_id)
