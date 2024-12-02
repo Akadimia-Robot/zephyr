@@ -452,22 +452,34 @@ static inline void bmi08x_acc_channel_get(const struct device *dev, enum sensor_
 
 static int bmi08x_temp_channel_get(const struct device *dev, struct sensor_value *val)
 {
-	uint16_t temp_raw = 0U;
-	int32_t temp_micro = 0;
-	int ret;
+        uint16_t temp_raw = 0U;
+        int32_t temp_micro = 0;
+        int16_t temp_int11 = 0;
+        int ret;
 
-	ret = bmi08x_accel_word_read(dev, BMI08X_REG_TEMP_MSB, &temp_raw);
-	if (ret < 0) {
-		return ret;
-	}
+        ret = bmi08x_accel_word_read(dev, BMI08X_REG_TEMP_MSB, &temp_raw);
+        temp_int11 = (temp_raw & 0xFF) << 3;
+        if (temp_raw == 0x80) {
+                /* temperature invalid */
+                return -ENODATA;
+        }
+        ret = bmi08x_accel_word_read(dev, BMI08X_REG_TEMP_LSB, &temp_raw);
+        temp_int11 |= (temp_raw & 0xE0) >> 5;
 
-	/* the scale is 1/2^5/LSB = 31250 micro degrees */
-	temp_micro = BMI08X_TEMP_OFFSET * 1000000ULL + temp_raw * 31250ULL;
+        if (ret < 0) {
+                return ret;
+        }
+        if (temp_int11 > 1023) {
+                temp_int11 -= 2048;
+        }
 
-	val->val1 = temp_micro / 1000000ULL;
-	val->val2 = temp_micro % 1000000ULL;
+        /* temp_int11 ranges in [-504, 496] */
+        /* the scale is 0.125°C/LSB = 125 micro degrees */
+        temp_micro = temp_int11 * 0.125 * 1000ULL + 23 * 1000000ULL;
+        val->val1 = temp_micro / 1000000ULL;
+        val->val2 = temp_micro % 1000000ULL;
 
-	return ret;
+        return ret;
 }
 
 static int bmi08x_channel_get(const struct device *dev, enum sensor_channel chan,
