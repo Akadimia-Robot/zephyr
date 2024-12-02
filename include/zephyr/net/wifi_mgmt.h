@@ -560,6 +560,8 @@ struct wifi_connect_req_params {
 	const uint8_t *identities[WIFI_ENT_IDENTITY_MAX_USERS];
 	/** User Passwords */
 	const uint8_t *passwords[WIFI_ENT_IDENTITY_MAX_USERS];
+	/** Parameter used for frequency band */
+	enum wifi_frequency_bandwidths bandwidth;
 };
 
 /** @brief Wi-Fi connect result codes. To be overlaid on top of \ref wifi_status
@@ -970,6 +972,7 @@ struct wifi_channel_info {
 
 /** @cond INTERNAL_HIDDEN */
 #define WIFI_AP_STA_MAX_INACTIVITY (LONG_MAX - 1)
+#define WIFI_AP_IEEE_80211_CAPAB_MAX_LEN 64
 /** @endcond */
 
 /** @brief Wi-Fi AP configuration parameter */
@@ -980,6 +983,14 @@ struct wifi_ap_config_params {
 	uint32_t max_inactivity;
 	/** Parameter used for setting maximum number of stations */
 	uint32_t max_num_sta;
+	/** Parameter used for frequency band */
+	enum wifi_frequency_bandwidths bandwidth;
+#if defined(CONFIG_WIFI_NM_WPA_SUPPLICANT)
+	/** Parameter used for setting HT capabilities */
+	char ht_capab[WIFI_AP_IEEE_80211_CAPAB_MAX_LEN + 1];
+	/** Parameter used for setting VHT capabilities */
+	char vht_capab[WIFI_AP_IEEE_80211_CAPAB_MAX_LEN + 1];
+#endif
 };
 
 #ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_DPP
