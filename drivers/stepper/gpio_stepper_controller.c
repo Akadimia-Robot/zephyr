@@ -261,9 +261,8 @@ static int gpio_stepper_set_max_velocity(const struct device *dev, uint32_t velo
 	return 0;
 }
 
-static int gpio_stepper_enable_constant_velocity_mode(const struct device *dev,
-						      const enum stepper_direction direction,
-						      const uint32_t value)
+static int gpio_stepper_run(const struct device *dev, const enum stepper_direction direction,
+			    const uint32_t value)
 {
 	struct gpio_stepper_data *data = dev->data;
 
@@ -360,7 +359,7 @@ static const struct stepper_driver_api gpio_stepper_api = {
 	.get_actual_position = gpio_stepper_get_actual_position,
 	.set_target_position = gpio_stepper_set_target_position,
 	.set_max_velocity = gpio_stepper_set_max_velocity,
-	.enable_constant_velocity_mode = gpio_stepper_enable_constant_velocity_mode,
+	.run = gpio_stepper_run,
 	.set_micro_step_res = gpio_stepper_set_micro_step_res,
 	.get_micro_step_res = gpio_stepper_get_micro_step_res,
 	.set_event_callback = gpio_stepper_set_event_callback,
