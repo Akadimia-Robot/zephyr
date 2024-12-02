@@ -8,6 +8,7 @@
 #include <zephyr/drivers/clock_control/nrf_clock_control.h>
 #include <zephyr/drivers/pinctrl.h>
 #include <soc.h>
+#include <dmm.h>
 #include <nrfx_pdm.h>
 
 #include <zephyr/logging/log.h>
@@ -36,6 +37,7 @@ struct dmic_nrfx_pdm_drv_cfg {
 		PCLK32M_HFXO,
 		ACLK
 	} clk_src;
+	void *mem_reg;
 };
 
 static void free_buffer(struct dmic_nrfx_pdm_drv_data *drv_data, void *buffer)
@@ -47,6 +49,7 @@ static void free_buffer(struct dmic_nrfx_pdm_drv_data *drv_data, void *buffer)
 static void event_handler(const struct device *dev, const nrfx_pdm_evt_t *evt)
 {
 	struct dmic_nrfx_pdm_drv_data *drv_data = dev->data;
+	const struct dmic_nrfx_pdm_drv_cfg *drv_cfg = dev->config;
 	int ret;
 	bool stop = false;
 
@@ -59,6 +62,14 @@ static void event_handler(const struct device *dev, const nrfx_pdm_evt_t *evt)
 			LOG_ERR("Failed to allocate buffer: %d", ret);
 			stop = true;
 		} else {
+			ret = dmm_buffer_in_prepare(drv_cfg->mem_reg, &buffer,
+						    drv_data->block_size,
+						    (void *)drv_data->mem_slab->buffer);
+			if (ret) {
+				LOG_ERR("Failed to prepare buffer: %d", ret);
+				stop = true;
+				goto stop_pdm;
+			}
 			err = nrfx_pdm_buffer_set(drv_data->pdm, buffer, drv_data->block_size / 2);
 			if (err != NRFX_SUCCESS) {
 				LOG_ERR("Failed to set buffer: 0x%08x", err);
@@ -69,6 +80,14 @@ static void event_handler(const struct device *dev, const nrfx_pdm_evt_t *evt)
 
 	if (drv_data->stopping) {
 		if (evt->buffer_released) {
+			ret = dmm_buffer_in_release(drv_cfg->mem_reg, evt->buffer_released,
+						    drv_data->block_size,
+						    (void *)drv_data->mem_slab->buffer);
+			if (ret) {
+				LOG_ERR("Failed to release buffer: %d", ret);
+				stop = true;
+				goto stop_pdm;
+			}
 			free_buffer(drv_data, evt->buffer_released);
 		}
 
@@ -85,13 +104,19 @@ static void event_handler(const struct device *dev, const nrfx_pdm_evt_t *evt)
 		if (ret < 0) {
 			LOG_ERR("No room in RX queue");
 			stop = true;
-
+			ret = dmm_buffer_in_release(drv_cfg->mem_reg, evt->buffer_released,
+						    drv_data->block_size,
+						    (void *)drv_data->mem_slab->buffer);
+			if (ret) {
+				LOG_ERR("Failed to release buffer: %d", ret);
+				goto stop_pdm;
+			}
 			free_buffer(drv_data, evt->buffer_released);
 		} else {
 			LOG_DBG("Queued buffer %p", evt->buffer_released);
 		}
 	}
-
+stop_pdm:
 	if (stop) {
 		drv_data->stopping = true;
 		nrfx_pdm_stop(drv_data->pdm);
@@ -168,7 +193,7 @@ static bool check_pdm_frequencies(const struct dmic_nrfx_pdm_drv_cfg *drv_cfg,
 		better_found = true;
 	}
 #else
-	if (IS_ENABLED(CONFIG_SOC_SERIES_NRF53X)) {
+	if (IS_ENABLED(CONFIG_SOC_SERIES_NRF53X) || IS_ENABLED(CONFIG_SOC_SERIES_NRF54HX)) {
 		const uint32_t src_freq =
 			(NRF_PDM_HAS_MCLKCONFIG && drv_cfg->clk_src == ACLK)
 			/* The DMIC_NRFX_PDM_DEVICE() macro contains build
@@ -180,9 +205,14 @@ static bool check_pdm_frequencies(const struct dmic_nrfx_pdm_drv_cfg *drv_cfg,
 			 * not defined (this expression will be eventually
 			 * optimized away then).
 			 */
+			/* TODO : PS does not provide correct formula for nRF54H20 PDM_CLK.
+			 * Assume that master clock source frequency is 8 MHz. Remove once
+			 * correct formula is found.
+			 */
 			? DT_PROP_OR(DT_NODELABEL(clock), hfclkaudio_frequency,
 				     0)
-			: 32*1000*1000UL;
+			: COND_CODE_1(IS_ENABLED(CONFIG_SOC_SERIES_NRF54HX),
+				      (8*1000*1000UL), (32*1000*1000UL));
 		uint32_t req_freq = req_rate * ratio;
 		/* As specified in the nRF5340 PS:
 		 *
@@ -562,6 +592,7 @@ static int dmic_nrfx_pdm_read(const struct device *dev,
 	return ret;
 }
 
+#if CONFIG_CLOCK_CONTROL_NRF
 static void init_clock_manager(const struct device *dev)
 {
 	struct dmic_nrfx_pdm_drv_data *drv_data = dev->data;
@@ -581,6 +612,7 @@ static void init_clock_manager(const struct device *dev)
 	drv_data->clk_mgr = z_nrf_clock_control_get_onoff(subsys);
 	__ASSERT_NO_MSG(drv_data->clk_mgr != NULL);
 }
+#endif
 
 static const struct _dmic_ops dmic_ops = {
 	.configure = dmic_nrfx_pdm_configure,
@@ -609,7 +641,8 @@ static const struct _dmic_ops dmic_ops = {
 		k_msgq_init(&dmic_nrfx_pdm_data##idx.rx_queue,		     \
 			    (char *)rx_msgs##idx, sizeof(void *),	     \
 			    ARRAY_SIZE(rx_msgs##idx));			     \
-		init_clock_manager(dev);				     \
+		IF_ENABLED(CONFIG_CLOCK_CONTROL_NRF,			     \
+			   (init_clock_manager(dev);))			     \
 		return 0;						     \
 	}								     \
 	static void event_handler##idx(const nrfx_pdm_evt_t *evt)	     \
@@ -624,6 +657,7 @@ static const struct _dmic_ops dmic_ops = {
 		.nrfx_def_cfg.skip_psel_cfg = true,			     \
 		.pcfg = PINCTRL_DT_DEV_CONFIG_GET(PDM(idx)),		     \
 		.clk_src = PDM_CLK_SRC(idx),				     \
+		.mem_reg = DMM_DEV_TO_REG(PDM(idx)),			     \
 	};								     \
 	BUILD_ASSERT(PDM_CLK_SRC(idx) != ACLK || NRF_PDM_HAS_MCLKCONFIG,     \
 		"Clock source ACLK is not available.");			     \
