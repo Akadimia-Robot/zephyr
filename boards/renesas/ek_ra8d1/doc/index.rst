@@ -112,6 +112,8 @@ The below features are currently supported on Zephyr OS for EK-RA8D1 board:
 +--------------+------------+------------------+
 | I2C          | on-chip    | i2c              |
 +--------------+------------+------------------+
+| OSPI         | on-chip    | ospi flash       |
++--------------+------------+------------------+
 
 Other hardware features are currently not supported by the port.
 
