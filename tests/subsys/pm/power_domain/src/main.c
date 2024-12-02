@@ -134,8 +134,10 @@ ZTEST(power_domain_1cpu, test_power_domain_device_runtime)
 
 	ret = pm_device_power_domain_remove(devc, domain);
 	zassert_equal(ret, -ENOENT);
+	zassert_equal(pm_device_get_power_domain(devc), NULL);
 
 	ret = pm_device_power_domain_add(devc, domain);
+	zassert_equal(pm_device_get_power_domain(devc), domain);
 	zassert_equal(ret, 0);
 
 	/* At this point all devices should be SUSPENDED */
@@ -219,6 +221,7 @@ ZTEST(power_domain_1cpu, test_power_domain_device_runtime)
 	zassert_equal(testing_domain_off_notitication, 0);
 
 	ret = pm_device_power_domain_remove(devc, domain);
+	zassert_equal(pm_device_get_power_domain(devc), NULL);
 	zassert_equal(ret, 0);
 }
 
@@ -288,13 +291,19 @@ ZTEST(power_domain_1cpu, test_on_power_domain)
 
 	pm_device_power_domain_remove(deva, domain);
 	zassert_false(pm_device_on_power_domain(deva), "deva is in the power domain.");
+	zassert_equal(pm_device_get_power_domain(deva), NULL);
+
 	pm_device_power_domain_add(deva, domain);
 	zassert_true(pm_device_on_power_domain(deva), "deva is not in the power domain.");
+	zassert_equal(pm_device_get_power_domain(deva), domain);
 
 	pm_device_power_domain_add(devc, domain);
 	zassert_true(pm_device_on_power_domain(devc), "devc is not in the power domain.");
+	zassert_equal(pm_device_get_power_domain(devc), domain);
+
 	pm_device_power_domain_remove(devc, domain);
 	zassert_false(pm_device_on_power_domain(devc), "devc in the power domain.");
+	zassert_equal(pm_device_get_power_domain(devc), NULL);
 }
 
 ZTEST_SUITE(power_domain_1cpu, NULL, NULL, ztest_simple_1cpu_before,
