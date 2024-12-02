@@ -18,6 +18,8 @@ supported:
   - gpio
   - uart
   - counter
+  - usb_device
+  - usbd
 testing:
   ignore_tags:
     - net
